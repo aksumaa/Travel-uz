@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Mail, Lock, Eye, EyeOff, Compass } from 'lucide-react';
+import { X, Mail, Lock, Eye, EyeOff, Compass } from '../icons';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -9,10 +10,12 @@ export const AuthModal: React.FC = () => {
     showAuthModal, 
     setShowAuthModal, 
     login, 
+    logout,
     isLoading,
     signInWithGoogle,
     signInWithApple 
   } = useAuth();
+  const router = useRouter();
   
   const { t } = useLanguage();
 
@@ -53,10 +56,20 @@ export const AuthModal: React.FC = () => {
 
     try {
       await login(email, password);
+      const saved = JSON.parse(localStorage.getItem('travel_uz_user') || '{}');
+      const requested = localStorage.getItem('auth_redirect_path');
+      localStorage.removeItem('auth_redirect_path');
+      if (requested === '/admin' && saved.role !== 'administrator' && saved.role !== 'admin') {
+        logout();
+        setErrorMsg('That account is a traveler. Use admin@traveluz.com to open the admin panel.');
+        return;
+      }
+      const dest = requested || (saved.role === 'administrator' || saved.role === 'admin' ? '/admin' : '/dashboard');
       setSuccessMsg(t('auth.successLogin'));
       setTimeout(() => {
         setShowAuthModal(false);
-      }, 1000);
+        router.push(dest);
+      }, 600);
     } catch (err: any) {
       setErrorMsg(err.message || t('auth.errorFields'));
     }
@@ -74,7 +87,8 @@ export const AuthModal: React.FC = () => {
       setSuccessMsg(t('auth.successLogin'));
       setTimeout(() => {
         setShowAuthModal(false);
-      }, 1000);
+        router.push('/dashboard');
+      }, 600);
     } catch (err: any) {
       setErrorMsg(err.message || 'OAuth authentication failed.');
     }
@@ -376,6 +390,12 @@ export const AuthModal: React.FC = () => {
                   </button>
                 </div>
               </div>
+
+              <p style={{ margin: 0, fontSize: '0.72rem', lineHeight: 1.5, color: 'var(--color-text-muted)' }}>
+                Traveler: traveler@traveluz.com / travel123
+                <br />
+                Admin: admin@traveluz.com / admin123
+              </p>
 
               {/* Submit button */}
               <button

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bot, CheckCircle, AlertCircle } from 'lucide-react';
+import { Bot, CheckCircle, AlertCircle } from '../icons';
 import { api } from '../services/api';
 export const TelegramSettingsView: React.FC = () => {
   const [botToken, setBotToken] = useState('');
@@ -66,7 +66,7 @@ export const TelegramSettingsView: React.FC = () => {
             Bot Integration Status
           </strong>
           <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-            {hasBot ? 'Encrypted Bot Token is connected to backend worker.' : 'No active Telegram bot connected.'}
+            {hasBot ? 'Bot details are saved on this device.' : 'No active Telegram bot connected.'}
           </span>
         </div>
 

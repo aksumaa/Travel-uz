@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plane, Sun, Moon, LogOut, Calendar, Menu, X, ChevronDown, LayoutDashboard } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Plane, Sun, Moon, LogOut, Calendar, Menu, X, ChevronDown, LayoutDashboard, Shield } from '../../icons';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -14,6 +15,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
   const { user, logout, setShowAuthModal } = useAuth();
   const { t, language, setLanguage } = useLanguage();
   const { theme, toggleTheme } = useTheme();
+  const router = useRouter();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
@@ -318,7 +320,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
                     }}
                   >
                     <button
-                      onClick={onNavigateHome}
+                      onClick={() => {
+                        localStorage.setItem('auth_redirect_view', 'home');
+                        setIsProfileDropdownOpen(false);
+                        router.push('/dashboard');
+                      }}
                       style={{
                         width: '100%',
                         padding: '10px 12px',
@@ -339,6 +345,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
                       <span>{t('dashboard.explore')}</span>
                     </button>
                     <button
+                      onClick={() => {
+                        localStorage.setItem('auth_redirect_view', 'my-trips');
+                        setIsProfileDropdownOpen(false);
+                        router.push('/dashboard');
+                      }}
                       style={{
                         width: '100%',
                         padding: '10px 12px',
@@ -358,11 +369,36 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
                       <Calendar size={14} />
                       <span>{t('nav.trips')}</span>
                     </button>
+                    <button
+                      onClick={() => {
+                        setIsProfileDropdownOpen(false);
+                        router.push('/admin');
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        textAlign: 'left',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        color: 'var(--text-secondary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        transition: 'all 0.2s',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <Shield size={14} />
+                      <span>Admin</span>
+                    </button>
                     <div style={{ height: '1px', background: 'var(--border)', margin: '4px 0' }} />
                     <button
                       onClick={() => {
                         logout();
                         setIsProfileDropdownOpen(false);
+                        router.push('/');
                       }}
                       style={{
                         width: '100%',
@@ -388,13 +424,27 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
               </AnimatePresence>
             </div>
           ) : (
+            <>
             <button
-              onClick={() => setShowAuthModal(true)}
+              onClick={() => {
+                localStorage.setItem('auth_redirect_path', '/admin');
+                router.push('/admin');
+              }}
+              style={{ padding: '8px 12px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)', background: 'transparent', border: '1px solid var(--border)' }}
+            >
+              Admin
+            </button>
+            <button
+              onClick={() => {
+                localStorage.setItem('auth_redirect_path', '/dashboard');
+                setShowAuthModal(true);
+              }}
               className="btn-primary"
               style={{ padding: '8px 18px', borderRadius: '10px', fontSize: '0.85rem' }}
             >
               {t('nav.login')}
             </button>
+            </>
           )}
         </div>
 

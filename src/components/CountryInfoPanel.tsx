@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Heart, CloudSun, Sun, CloudRain, Cloud, Compass, Calendar, Key, Sparkles, 
   MapPin, Globe, Languages, DollarSign, Clock 
-} from 'lucide-react';
+} from '../icons';
 import { useTranslation } from '../context/LanguageContext';
 
 export interface CountryData {

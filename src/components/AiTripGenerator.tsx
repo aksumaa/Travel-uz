@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, Share2, Download, Save, CheckCircle, AlertCircle } from 'lucide-react';
+import { Sparkles, Share2, Download, Save, CheckCircle, AlertCircle } from '../icons';
 import { useLanguage } from '../context/LanguageContext';
 import { api } from '../services/api';
+import { openItineraryPrint } from '../services/printItinerary';
 
 interface AiTripGeneratorProps {
   onSave?: (trip: any) => void;
@@ -106,7 +107,7 @@ export const AiTripGenerator: React.FC<AiTripGeneratorProps> = ({ onSave }) => {
       if (data.id) setCurrentItineraryId(data.id);
       if (data.share_token) setShareToken(data.share_token);
       setActiveDayTab(0);
-      setSuccessText("AI Itinerary generated & persisted on secure backend!");
+      setSuccessText("Itinerary is ready and saved in this browser.");
     } catch (e: any) {
       console.warn("Backend API offline or unavailable, generating client-side itinerary fallback:", e);
       const fallbackItinerary = {
@@ -222,7 +223,7 @@ export const AiTripGenerator: React.FC<AiTripGeneratorProps> = ({ onSave }) => {
       setSuccessText("Itinerary saved successfully to your Agency Account & My Trips!");
     } catch (err: any) {
       console.error("Save error:", err);
-      setErrorText(err.message || "Failed to save trip to backend.");
+      setErrorText(err.message || "Could not save this trip.");
     }
   };
 
@@ -243,8 +244,7 @@ export const AiTripGenerator: React.FC<AiTripGeneratorProps> = ({ onSave }) => {
       return;
     }
     try {
-      const pdfUrl = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'}/trips/${currentItineraryId}/pdf`;
-      window.open(pdfUrl, '_blank');
+      openItineraryPrint(generatedTrip.title || destination, generatedTrip.summary || '', generatedTrip.days || []);
     } catch (e: any) {
       setErrorText("Failed to download PDF.");
     }
@@ -276,7 +276,7 @@ export const AiTripGenerator: React.FC<AiTripGeneratorProps> = ({ onSave }) => {
           Generate Client Itineraries in Seconds
         </h2>
         <p style={{ color: 'var(--color-text-muted)', fontSize: '1rem', maxWidth: '600px', margin: '0 auto' }}>
-          Backend-proxied Claude 3.5 Sonnet server engine for tour agencies. Zero client-side API key exposure.
+          Day-by-day client itineraries, saved in this browser. No API keys required.
         </p>
       </div>
 

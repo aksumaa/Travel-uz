@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, X } from 'lucide-react';
+import { ArrowRight, X } from '../icons';
 import { useAuth } from '../context/AuthContext';
 
 interface AgencyOnboardingModalProps {

@@ -34,61 +34,29 @@ TravelUZ is an enterprise-grade B2B SaaS platform for tour agencies and travel o
 
 ---
 
-## 🚀 Local Development Setup
+## Run and deploy
 
-### Prerequisites
-- Node.js >= 18
-- Python >= 3.12
-- Docker & Docker Compose (optional, for containerized local dev)
-
-### Option 1: One Command with Docker Compose (Recommended)
-
-1. **Clone repository**:
-   ```bash
-   git clone https://github.com/your-org/travel-uz.git
-   cd travel-uz
-   ```
-
-2. **Start all services (PostgreSQL + FastAPI Backend + Telegram Worker + Frontend)**:
-   ```bash
-   docker compose up --build
-   ```
-
-3. **Access points**:
-   - **Frontend App**: http://localhost
-   - **FastAPI OpenAPI Docs**: http://localhost:8000/docs
-   - **PostgreSQL Database**: `localhost:5432`
-
----
-
-### Option 2: Manual Local Development Setup
-
-#### 1. Backend Setup
+The site is a Next.js app in this folder. It does not use a backend or environment variables. Trips, sign-in, and the admin panel are stored in the browser.
 
 ```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env
-
-# Run database migrations
-alembic upgrade head
-
-# Start FastAPI server
-uvicorn app.main:app --reload --port 8000
-```
-
-#### 2. Frontend Setup
-
-```bash
-# In the repository root
 npm install
-cp .env.example .env
 npm run dev
 ```
 
-Frontend dev server will be live at `http://localhost:5173`.
+Open http://localhost:3000
+
+- Website: `/`
+- Traveler app: `/dashboard` — `traveler@traveluz.com` / `travel123`
+- Admin panel: `/admin` — `admin@traveluz.com` / `admin123`
+- Sample shared trip: `/trip/silk-road`
+
+Deploy on Vercel by importing this repository. The build command is `npm run build`. No environment variables are required.
+
+```bash
+npm run build
+npm start
+```
+
 
 ---
 
