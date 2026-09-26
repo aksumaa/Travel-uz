@@ -101,8 +101,11 @@ function calculateBBox(geometry: any): [number, number, number, number] {
   return [minLon, minLat, maxLon, maxLat];
 }
 
+const getResponsiveSegments = () => (typeof window !== 'undefined' && window.innerWidth < 768 ? 36 : 64);
+
 // Atmosphere Glowing Shader
 const Atmosphere: React.FC = () => {
+  const segments = useMemo(() => getResponsiveSegments(), []);
   const vertexShader = `
     varying vec3 vNormal;
     void main() {
@@ -121,7 +124,7 @@ const Atmosphere: React.FC = () => {
 
   return (
     <mesh>
-      <sphereGeometry args={[2.58, 64, 64]} />
+      <sphereGeometry args={[2.58, segments, segments]} />
       <shaderMaterial
         vertexShader={vertexShader}
         fragmentShader={fragmentShader}
@@ -138,6 +141,7 @@ const Atmosphere: React.FC = () => {
 const Clouds: React.FC = () => {
   const cloudsRef = useRef<THREE.Mesh>(null);
   const cloudsTexture = useTexture('/textures/earth_clouds.jpg');
+  const segments = useMemo(() => getResponsiveSegments(), []);
 
   useFrame(() => {
     if (cloudsRef.current) {
@@ -147,7 +151,7 @@ const Clouds: React.FC = () => {
 
   return (
     <mesh ref={cloudsRef}>
-      <sphereGeometry args={[2.52, 64, 64]} />
+      <sphereGeometry args={[2.52, segments, segments]} />
       <meshPhongMaterial
         map={cloudsTexture}
         transparent={true}
@@ -170,6 +174,7 @@ interface EarthMeshProps {
 const EarthMesh: React.FC<EarthMeshProps> = ({ 
   onPointerMove, onPointerOut, onPointerDown, onPointerUp, earthRef 
 }) => {
+  const segments = useMemo(() => getResponsiveSegments(), []);
   const textures = useTexture({
     map: '/textures/earth_daymap.jpg',
     normalMap: '/textures/earth_normal.jpg',
@@ -184,7 +189,7 @@ const EarthMesh: React.FC<EarthMeshProps> = ({
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
     >
-      <sphereGeometry args={[2.5, 64, 64]} />
+      <sphereGeometry args={[2.5, segments, segments]} />
       <meshPhongMaterial
         map={textures.map}
         normalMap={textures.normalMap}
@@ -463,7 +468,7 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
     return geometry;
   }, [geoJsonData]);
 
-  // Selected borders highlight
+  // Selected borders highlight with disposal cleanup
   const selectedBordersGeom = useMemo(() => {
     if (!selectedCountryFeature) return null;
     const points: number[] = [];
@@ -497,7 +502,14 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
     return geometry;
   }, [selectedCountryFeature]);
 
-  // Hovered borders highlight
+  // Clean up selected borders geometry
+  useEffect(() => {
+    return () => {
+      if (selectedBordersGeom) selectedBordersGeom.dispose();
+    };
+  }, [selectedBordersGeom]);
+
+  // Hovered borders highlight with disposal cleanup
   const hoveredBordersGeom = useMemo(() => {
     if (!hoveredCountryFeature) return null;
     const points: number[] = [];
@@ -531,6 +543,13 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
     return geometry;
   }, [hoveredCountryFeature]);
 
+  // Clean up hovered borders geometry
+  useEffect(() => {
+    return () => {
+      if (hoveredBordersGeom) hoveredBordersGeom.dispose();
+    };
+  }, [hoveredBordersGeom]);
+
   const findCountryAt = (lon: number, lat: number) => {
     if (!geoJsonData) return null;
 
@@ -561,14 +580,15 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
 
   const handlePointerMove = (e: any) => {
     e.stopPropagation();
-    if (!earthRef.current) return;
+    if (!earthRef.current || dragStartRef.current) return;
 
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
 
     const point = e.point.clone();
 
     hoverTimeoutRef.current = setTimeout(() => {
-      const localPoint = earthRef.current!.worldToLocal(point);
+      if (!earthRef.current) return;
+      const localPoint = earthRef.current.worldToLocal(point);
       const { lat, lng } = xyzToLatLng(localPoint.x, localPoint.y, localPoint.z, 2.5);
 
       const country = findCountryAt(lng, lat);

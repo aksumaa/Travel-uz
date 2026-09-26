@@ -56,6 +56,8 @@ export const Globe3D: React.FC<GlobeProps> = ({
     if (onSelectCountry) onSelectCountry('uzbekistan');
   };
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+
   return (
     <div
       onPointerDown={triggerAutoRotatePause}
@@ -70,8 +72,8 @@ export const Globe3D: React.FC<GlobeProps> = ({
     >
       <Canvas
         camera={{ position: [0, 0, 6], fov: 45 }}
-        gl={{ antialias: true, alpha: true }}
-        dpr={Math.min(window.devicePixelRatio, 2)}
+        gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
+        dpr={isMobile ? 1 : Math.min(window.devicePixelRatio, 1.5)}
         style={{ background: 'transparent', outline: 'none' }}
       >
         <Suspense fallback={null}>

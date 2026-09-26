@@ -1,0 +1,204 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "TravelUZ B2B SaaS API",
+    "version": "1.0.0",
+    "description": "FastAPI backend service for TravelUZ travel agency SaaS platform featuring AI trip generation, RBAC, CRM, PDF generation, and Telegram notifications."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/api/v1",
+      "description": "Local Development Server"
+    }
+  ],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Register User Account",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password", "name"],
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string" },
+                  "name": { "type": "string" },
+                  "role": { "type": "string", "enum": ["agency_owner", "agency_staff", "client", "admin"], "default": "agency_owner" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Token response with user details" }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "User Login",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Token response with user details" }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Refresh Access Token",
+        "parameters": [
+          { "name": "refresh_token_str", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "New access and refresh tokens" }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Get Current Authenticated User",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Authenticated user information" }
+        }
+      }
+    },
+    "/trips/generate": {
+      "post": {
+        "tags": ["Trips"],
+        "summary": "Generate AI Trip Itinerary (Proxies Anthropic API)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["destination"],
+                "properties": {
+                  "destination": { "type": "string" },
+                  "days": { "type": "integer", "default": 3 },
+                  "start_date": { "type": "string", "format": "date" },
+                  "end_date": { "type": "string", "format": "date" },
+                  "budget": { "type": "number", "default": 1500.0 },
+                  "travelers": { "type": "integer", "default": 2 },
+                  "style": { "type": "string", "default": "Adventure" },
+                  "language": { "type": "string", "default": "en" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Generated itinerary object with share_token" }
+        }
+      }
+    },
+    "/trips": {
+      "get": {
+        "tags": ["Trips"],
+        "summary": "List Agency / User Itineraries",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "List of itineraries" } }
+      },
+      "post": {
+        "tags": ["Trips"],
+        "summary": "Create Manual Itinerary",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Created itinerary object" } }
+      }
+    },
+    "/trips/share/{share_token}": {
+      "get": {
+        "tags": ["Trips"],
+        "summary": "Get Public Shared Itinerary",
+        "parameters": [
+          { "name": "share_token", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Public itinerary object with agency branding" } }
+      }
+    },
+    "/itineraries/{id}/pdf": {
+      "get": {
+        "tags": ["Itineraries"],
+        "summary": "Download Itinerary PDF (WeasyPrint Rendering)",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "PDF File Stream", "content": { "application/pdf": {} } }
+        }
+      }
+    },
+    "/leads/public": {
+      "post": {
+        "tags": ["Leads"],
+        "summary": "Create Public Lead from Shared Itinerary (Triggers Telegram Alert)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["share_token", "client_name", "client_contact"],
+                "properties": {
+                  "share_token": { "type": "string" },
+                  "client_name": { "type": "string" },
+                  "client_contact": { "type": "string" },
+                  "notes": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Created lead object" } }
+      }
+    },
+    "/leads": {
+      "get": {
+        "tags": ["Leads"],
+        "summary": "List Agency Leads",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "List of leads" } }
+      }
+    },
+    "/agencies/analytics": {
+      "get": {
+        "tags": ["Agencies"],
+        "summary": "Get Agency CRM & Revenue Analytics",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Analytics data object" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}

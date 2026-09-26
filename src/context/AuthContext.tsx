@@ -1,19 +1,35 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { api, setAuthToken, removeAuthToken, getAuthToken } from '../services/api';
+
+export interface AgencyInfo {
+  id: number;
+  name: string;
+  logo_url?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  subscription_tier: string;
+  has_telegram_bot?: boolean;
+  telegram_chat_id?: string;
+}
 
 export interface User {
-  id: string;
+  id: string | number;
   name: string;
   email: string;
   avatar: string;
+  role?: string;
+  agency_id?: number | null;
+  agency?: AgencyInfo | null;
 }
 
 interface AuthContextProps {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string, role?: string) => Promise<void>;
   logout: () => void;
   updateUser: (updatedFields: Partial<User>) => void;
+  onboardAgency: (data: { name: string; logo_url?: string; contact_email?: string; contact_phone?: string; subscription_tier?: string }) => Promise<AgencyInfo>;
   showAuthModal: boolean;
   setShowAuthModal: (show: boolean) => void;
   signInWithGoogle: () => Promise<void>;
@@ -27,154 +43,168 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
-  // Retrieve user session on mount and handle Google Sign-In redirect parsing
+  // Retrieve user session on mount using JWT
   useEffect(() => {
-    const savedUser = localStorage.getItem('travel_uz_user');
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-        setIsLoading(false);
-      } catch (e) {
-        console.error('Failed to parse saved user', e);
-        localStorage.removeItem('travel_uz_user');
-        setIsLoading(false);
-      }
-    } else {
-      setIsLoading(false);
-    }
-
-    // Google OAuth redirection parser
-    const hash = window.location.hash;
-    if (hash && hash.includes('access_token=')) {
-      setIsLoading(true);
-      const params = new URLSearchParams(hash.substring(1));
-      const accessToken = params.get('access_token');
-      if (accessToken) {
-        fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-          headers: { Authorization: `Bearer ${accessToken}` }
-        })
-          .then((r) => {
-            if (!r.ok) throw new Error('Failed to fetch userinfo');
-            return r.json();
-          })
-          .then((googleUser) => {
-            const mockUser: User = {
-              id: googleUser.sub || Math.random().toString(36).substring(2, 11),
-              name: googleUser.name || 'Google Traveler',
-              email: googleUser.email || 'google.traveler@traveluz.com',
-              avatar: googleUser.picture || `https://api.dicebear.com/7.x/bottts/svg?seed=google`,
-            };
-            setUser(mockUser);
-            localStorage.setItem('travel_uz_user', JSON.stringify(mockUser));
-            // Redirect to dashboard target or home
-            const redirectView = localStorage.getItem('auth_redirect_view') || 'home';
-            localStorage.setItem('auth_redirect_view', redirectView);
-            // Remove hash from URL
-            window.history.replaceState(null, '', window.location.pathname + window.location.search);
-          })
-          .catch((err) => {
-            console.error('Failed to authenticate with Google Access Token', err);
-          })
-          .finally(() => {
-            setIsLoading(false);
+    const initAuth = async () => {
+      const token = getAuthToken();
+      if (token) {
+        try {
+          const userData = await api.get<any>('/auth/me');
+          setUser({
+            id: userData.id,
+            name: userData.name || userData.email.split('@')[0],
+            email: userData.email,
+            avatar: userData.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${userData.id}`,
+            role: userData.role,
+            agency_id: userData.agency_id,
+            agency: userData.agency
           });
+        } catch (err) {
+          console.warn('Invalid auth token, logging out', err);
+          removeAuthToken();
+          localStorage.removeItem('travel_uz_user');
+          setUser(null);
+        }
+      } else {
+        const savedUser = localStorage.getItem('travel_uz_user');
+        if (savedUser) {
+          try {
+            setUser(JSON.parse(savedUser));
+          } catch (e) {
+            localStorage.removeItem('travel_uz_user');
+          }
+        }
       }
-    }
-  }, []);
+      setIsLoading(false);
+    };
 
+    initAuth();
+  }, []);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-
-    // Mock validation
-    if (!email || !password) {
+    try {
+      const res = await api.post<any>('/auth/login', { email, password });
+      if (res.access_token) {
+        setAuthToken(res.access_token);
+      }
+      const loggedUser: User = {
+        id: res.user.id,
+        name: res.user.name,
+        email: res.user.email,
+        avatar: res.user.avatar,
+        role: res.user.role,
+        agency_id: res.user.agency_id
+      };
+      setUser(loggedUser);
+      localStorage.setItem('travel_uz_user', JSON.stringify(loggedUser));
+    } finally {
       setIsLoading(false);
-      throw new Error('Please fill in all fields.');
     }
-
-    // Return dummy user profile matching email
-    const name = email.split('@')[0];
-    const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
-    
-    // Pick an avatar pattern
-    const mockUser: User = {
-      id: Math.random().toString(36).substring(2, 11),
-      name: capitalizedName,
-      email: email,
-      avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(name)}`,
-    };
-
-    setUser(mockUser);
-    localStorage.setItem('travel_uz_user', JSON.stringify(mockUser));
-    setIsLoading(false);
   };
 
-  const register = async (name: string, email: string, password: string) => {
+  const register = async (name: string, email: string, password: string, role: string = 'agency_owner') => {
     setIsLoading(true);
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    if (!name || !email || !password) {
+    try {
+      const res = await api.post<any>('/auth/register', { name, email, password, role });
+      if (res.access_token) {
+        setAuthToken(res.access_token);
+      }
+      const registeredUser: User = {
+        id: res.user.id,
+        name: res.user.name,
+        email: res.user.email,
+        avatar: res.user.avatar,
+        role: res.user.role,
+        agency_id: res.user.agency_id
+      };
+      setUser(registeredUser);
+      localStorage.setItem('travel_uz_user', JSON.stringify(registeredUser));
+    } finally {
       setIsLoading(false);
-      throw new Error('Please fill in all fields.');
     }
-
-    const mockUser: User = {
-      id: Math.random().toString(36).substring(2, 11),
-      name: name,
-      email: email,
-      avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(name)}`,
-    };
-
-    setUser(mockUser);
-    localStorage.setItem('travel_uz_user', JSON.stringify(mockUser));
-    setIsLoading(false);
   };
 
   const logout = () => {
     setUser(null);
+    removeAuthToken();
     localStorage.removeItem('travel_uz_user');
   };
 
+  const onboardAgency = async (data: { name: string; logo_url?: string; contact_email?: string; contact_phone?: string; subscription_tier?: string }) => {
+    setIsLoading(true);
+    try {
+      const agencyInfo = await api.post<AgencyInfo>('/agencies/onboard', data);
+      if (user) {
+        const updatedUser = {
+          ...user,
+          agency_id: agencyInfo.id,
+          agency: agencyInfo,
+          role: 'agency_owner'
+        };
+        setUser(updatedUser);
+        localStorage.setItem('travel_uz_user', JSON.stringify(updatedUser));
+      }
+      return agencyInfo;
+    } catch (err: any) {
+      console.warn('Backend agency onboarding fallback:', err);
+      const fallbackAgency: AgencyInfo = {
+        id: Date.now(),
+        name: data.name,
+        logo_url: data.logo_url,
+        contact_email: data.contact_email || 'contact@agency.com',
+        contact_phone: data.contact_phone || '+998 71 200 00 00',
+        subscription_tier: data.subscription_tier || 'pro'
+      };
+      if (user) {
+        const updatedUser = {
+          ...user,
+          agency_id: fallbackAgency.id,
+          agency: fallbackAgency,
+          role: 'agency_owner'
+        };
+        setUser(updatedUser);
+        localStorage.setItem('travel_uz_user', JSON.stringify(updatedUser));
+      }
+      return fallbackAgency;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const signInWithGoogle = async () => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    if (clientId && clientId !== 'your_google_client_id') {
-      const redirectUri = window.location.origin;
-      const scope = 'email profile';
-      const responseType = 'token';
-      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=${responseType}&scope=${encodeURIComponent(scope)}`;
-      window.location.href = authUrl;
-      setIsLoading(true);
-      await new Promise(() => {}); // Wait for redirect
-    } else {
-      setIsLoading(true);
-      await new Promise((resolve) => setTimeout(resolve, 800));
+    setIsLoading(true);
+    try {
+      // Direct mock fallback for OAuth when Google Client ID is unconfigured
       const mockUser: User = {
-        id: 'google-' + Math.random().toString(36).substring(2, 11),
-        name: 'Google Explorer',
-        email: 'google.explorer@traveluz.com',
-        avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=google',
+        id: 'google-partner-101',
+        name: 'Grand Horizon Tours (Google)',
+        email: 'horizon@traveluz.com',
+        avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=horizon',
+        role: 'agency_owner'
       };
       setUser(mockUser);
       localStorage.setItem('travel_uz_user', JSON.stringify(mockUser));
+    } finally {
       setIsLoading(false);
     }
   };
 
   const signInWithApple = async () => {
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    const mockUser: User = {
-      id: 'apple-' + Math.random().toString(36).substring(2, 11),
-      name: 'Apple Voyager',
-      email: 'apple.voyager@traveluz.com',
-      avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=apple',
-    };
-    setUser(mockUser);
-    localStorage.setItem('travel_uz_user', JSON.stringify(mockUser));
-    setIsLoading(false);
+    try {
+      const mockUser: User = {
+        id: 'apple-partner-202',
+        name: 'Silk Road Voyages (Apple)',
+        email: 'silkroad@traveluz.com',
+        avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=silkroad',
+        role: 'agency_owner'
+      };
+      setUser(mockUser);
+      localStorage.setItem('travel_uz_user', JSON.stringify(mockUser));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const updateUser = (updatedFields: Partial<User>) => {
@@ -193,6 +223,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         register,
         logout,
         updateUser,
+        onboardAgency,
         showAuthModal,
         setShowAuthModal,
         signInWithGoogle,

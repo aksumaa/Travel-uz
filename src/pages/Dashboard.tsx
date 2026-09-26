@@ -13,8 +13,13 @@ import { TripDetailsView } from './TripDetailsView';
 import { AdminView } from './AdminView';
 import { 
   Globe, Brain, Calendar, Map, Plane, Hotel, Star, Heart, 
-  MessageSquare, User, Settings, Search, Sun, Moon, Bell, X, Navigation, ChevronDown, Shield 
+  MessageSquare, User, Settings, Search, Sun, Moon, Bell, X, Navigation, ChevronDown, Shield, Users, TrendingUp, Building2 
 } from 'lucide-react';
+import { CrmPipelineView } from '../components/CrmPipelineView';
+import { AgencyAnalyticsView } from '../components/AgencyAnalyticsView';
+import { TelegramSettingsView } from '../components/TelegramSettingsView';
+import { AgencyOnboardingModal } from '../components/AgencyOnboardingModal';
+import { api } from '../services/api';
 
 interface DashboardProps {
   initialView?: string;
@@ -111,6 +116,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
     }
   };
 
+  const [showOnboardModal, setShowOnboardModal] = useState(false);
+
   const handleFloatingChatSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim() || sending) return;
@@ -123,25 +130,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
     setChatMessages(updated);
 
     try {
-      const ANTHROPIC_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY;
-      if (!ANTHROPIC_KEY) throw new Error('Key missing.');
-
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': ANTHROPIC_KEY,
-          'anthropic-version': '2023-06-01',
-          'dangerouslyAllowBrowser': 'true'
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1000,
-          messages: [{ role: 'user', content: userText }]
-        })
+      const data = await api.post<any>('/trips/generate', {
+        destination: userText,
+        days: 3
       });
-      const data = await response.json();
-      const botText = data.content[0].text;
+      const itin = data.itinerary || data.raw_trip_data;
+      const botText = itin?.summary || `Generated custom itinerary for ${userText}! Total cost: $${itin?.totalCost || 1500}`;
       setChatMessages([...updated, { sender: 'assistant', text: botText }]);
     } catch (e) {
       await new Promise(resolve => setTimeout(resolve, 800));
@@ -163,6 +157,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--color-bg)', position: 'relative' }}>
       
+      {/* Agency Onboarding Modal */}
+      <AgencyOnboardingModal
+        isOpen={showOnboardModal}
+        onClose={() => setShowOnboardModal(false)}
+        onSuccess={() => alert('Agency onboarded successfully!')}
+      />
+
       {/* SIDEBAR (Desktop only) */}
       <aside className="dashboard-sidebar-panel" style={{
         width: '240px',
@@ -186,18 +187,41 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
           </span>
         </div>
 
+        {/* Agency Onboarding Quick Button */}
+        <button
+          onClick={() => setShowOnboardModal(true)}
+          style={{
+            padding: '10px 14px',
+            borderRadius: '12px',
+            background: 'linear-gradient(135deg, var(--color-accent), var(--color-purple))',
+            color: '#ffffff',
+            fontWeight: 800,
+            fontSize: '0.8rem',
+            border: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            cursor: 'pointer'
+          }}
+        >
+          <Building2 size={16} /> Onboard Agency
+        </button>
+
         {/* Navigation Items */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto', flex: 1 }} className="sidebar-scrollable-links">
           {[
             { id: 'home', label: t('dashboard.sidebarHome'), icon: <Globe size={16} /> },
             { id: 'planner', label: t('dashboard.sidebarPlanner'), icon: <Brain size={16} /> },
             { id: 'my-trips', label: t('dashboard.sidebarMyTrips'), icon: <Calendar size={16} /> },
+            { id: 'crm', label: 'CRM Leads', icon: <Users size={16} /> },
+            { id: 'analytics', label: 'Agency Analytics', icon: <TrendingUp size={16} /> },
+            { id: 'telegram', label: 'Telegram Bot', icon: <MessageSquare size={16} /> },
             { id: 'ready-trips', label: t('dashboard.sidebarReadyTrips'), icon: <Map size={16} /> },
             { id: 'flights', label: t('dashboard.sidebarFlights'), icon: <Plane size={16} /> },
             { id: 'hotels', label: t('dashboard.sidebarHotels'), icon: <Hotel size={16} /> },
             { id: 'attractions', label: t('dashboard.sidebarAttractions'), icon: <Star size={16} /> },
             { id: 'saved', label: t('dashboard.sidebarSaved'), icon: <Heart size={16} /> },
-            { id: 'assistant', label: t('dashboard.sidebarAssistant'), icon: <MessageSquare size={16} /> },
             { id: 'profile', label: t('dashboard.sidebarProfile'), icon: <User size={16} /> },
             { id: 'settings', label: t('dashboard.sidebarSettings'), icon: <Settings size={16} /> },
             { id: 'admin', label: 'Admin Console', icon: <Shield size={16} /> }
@@ -603,6 +627,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
               onBack={() => handleTabChange('my-trips')}
             />
           )}
+          {activeTab === 'crm' && <CrmPipelineView />}
+          {activeTab === 'analytics' && <AgencyAnalyticsView />}
+          {activeTab === 'telegram' && <TelegramSettingsView />}
           {activeTab === 'flights' && <FlightsView />}
           {activeTab === 'hotels' && <HotelsView />}
           {activeTab === 'attractions' && <AttractionsView />}

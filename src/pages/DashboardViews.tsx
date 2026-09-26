@@ -7,6 +7,7 @@ import {
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../services/api';
 
 interface MyTripsViewProps {
   onViewTrip?: (id: string) => void;
@@ -65,39 +66,31 @@ export const MyTripsView: React.FC<MyTripsViewProps> = ({ onViewTrip }) => {
     }));
   });
 
-  // Fetch remote trips from Supabase on mount
+  // Fetch remote trips from FastAPI backend on mount
   React.useEffect(() => {
-    const fetchSupabaseTrips = async () => {
-      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      if (!SUPABASE_URL || !SUPABASE_KEY || !user) return;
-
+    const fetchBackendTrips = async () => {
+      if (!user) return;
       try {
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/trips?user_id=eq.${user.id}`, {
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`
-          }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          const supabaseTrips = data.map((t: any) => ({
+        const data = await api.get<any[]>('/trips');
+        if (data && Array.isArray(data)) {
+          const remoteTrips = data.map((t: any) => ({
             id: t.id,
-            destination: t.title,
-            startDate: t.trip_data?.startDate || new Date().toISOString().split('T')[0],
-            endDate: t.trip_data?.endDate || new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString().split('T')[0],
-            travelers: t.trip_data?.travelers || 1,
-            budget: t.trip_data?.budget || 'Medium',
-            style: t.trip_data?.style || 'Adventure',
-            status: new Date(t.trip_data?.startDate || Date.now()) > new Date() ? 'Upcoming' : 'Completed',
-            totalCost: t.total_cost || 1500,
-            image: t.trip_data?.image || 'https://images.unsplash.com/photo-1501555088652-021faa106b9b?auto=format&fit=crop&w=400&q=80'
+            destination: t.title || t.destination,
+            startDate: t.content_json?.startDate || new Date().toISOString().split('T')[0],
+            endDate: t.content_json?.endDate || new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString().split('T')[0],
+            travelers: t.content_json?.travelers || 2,
+            budget: t.content_json?.budget || 'Medium',
+            style: t.content_json?.style || 'Adventure',
+            status: new Date(t.content_json?.startDate || Date.now()) > new Date() ? 'Upcoming' : 'Completed',
+            totalCost: t.content_json?.totalCost || 1500,
+            share_token: t.share_token,
+            image: 'https://images.unsplash.com/photo-1501555088652-021faa106b9b?auto=format&fit=crop&w=400&q=80'
           }));
 
           setTrips(prev => {
             const combined = [...prev];
-            supabaseTrips.forEach((st: any) => {
-              if (!combined.some(ct => ct.destination === st.destination && ct.startDate === st.startDate)) {
+            remoteTrips.forEach((st: any) => {
+              if (!combined.some(ct => String(ct.id) === String(st.id))) {
                 combined.unshift(st);
               }
             });
@@ -105,10 +98,10 @@ export const MyTripsView: React.FC<MyTripsViewProps> = ({ onViewTrip }) => {
           });
         }
       } catch (err) {
-        console.warn('Failed to fetch from Supabase:', err);
+        console.warn('Failed to fetch trips from backend:', err);
       }
     };
-    fetchSupabaseTrips();
+    fetchBackendTrips();
   }, [user]);
 
   const handleDelete = async (id: string | number) => {
@@ -122,21 +115,13 @@ export const MyTripsView: React.FC<MyTripsViewProps> = ({ onViewTrip }) => {
       localStorage.setItem('travel_uz_ai_trips', JSON.stringify(list.filter((t: any) => t.id !== id)));
     }
 
-    // Sync remote back if numeric (Supabase auto-increment ID) or custom format
-    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-    const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    if (SUPABASE_URL && SUPABASE_KEY && (typeof id === 'number' || String(id).startsWith('supabase-') || !String(id).startsWith('ai-'))) {
-      try {
-        await fetch(`${SUPABASE_URL}/rest/v1/trips?id=eq.${id}`, {
-          method: 'DELETE',
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`
-          }
-        });
-      } catch (err) {
-        console.warn('Failed to delete from Supabase:', err);
+    // Sync remote delete
+    try {
+      if (typeof id === 'number' || (!String(id).startsWith('t-') && !String(id).startsWith('ai-'))) {
+        await api.delete(`/trips/${id}`);
       }
+    } catch (err) {
+      console.warn('Failed to delete trip from backend:', err);
     }
     alert('Itinerary removed successfully.');
   };
@@ -730,36 +715,15 @@ export const AIAssistantView: React.FC = () => {
     setMessages(updatedMsgs);
 
     try {
-      const ANTHROPIC_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY;
-      if (!ANTHROPIC_KEY) {
-        throw new Error('No API key provided.');
-      }
-
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': ANTHROPIC_KEY,
-          'anthropic-version': '2023-06-01',
-          'dangerouslyAllowBrowser': 'true'
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1000,
-          messages: [{
-            role: 'user',
-            content: `You are a helpful travel assistant for TravelUZ. Answer this query in a brief, helpful manner: ${userText}`
-          }]
-        })
+      const data = await api.post<any>('/trips/generate', {
+        destination: userText,
+        days: 3
       });
-
-      const data = await response.json();
-      const botText = data.content[0].text;
+      const itin = data.itinerary || data.raw_trip_data;
+      const botText = itin?.summary || `I generated a custom itinerary for ${userText}! Estimated cost: $${itin?.totalCost || 1500}`;
       setMessages([...updatedMsgs, { sender: 'assistant', text: botText }]);
     } catch (err) {
-      console.warn('API call failed or key is missing. Using local fallback assistant.', err);
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
+      console.warn('Backend query fallback:', err);
       let reply = 'I am looking up meteorological trends and visa requirements for your query. Let me know which coordinates you want to map out!';
       const textLower = userText.toLowerCase();
       if (textLower.includes('samarkand') || textLower.includes('uzbekistan')) {

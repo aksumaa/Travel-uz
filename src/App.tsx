@@ -11,11 +11,17 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 // Lazy loaded page components
 const LandingPage = lazy(() => import('./pages/LandingPage').then(m => ({ default: m.LandingPage })));
 const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
+const PublicItineraryView = lazy(() => import('./components/PublicItineraryView').then(m => ({ default: m.PublicItineraryView })));
 
 function AppContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [dashboardView, setDashboardView] = useState('home');
   const { user } = useAuth();
+
+  // Check public itinerary link
+  const pathname = window.location.pathname;
+  const isPublicTrip = pathname.startsWith('/trip/');
+  const shareToken = isPublicTrip ? pathname.replace('/trip/', '').split('/')[0] : '';
 
   // Redirect to target tab after successful login
   useEffect(() => {
@@ -27,6 +33,14 @@ function AppContent() {
       }
     }
   }, [user]);
+
+  if (isPublicTrip && shareToken) {
+    return (
+      <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center' }}>Loading Tour Itinerary...</div>}>
+        <PublicItineraryView shareToken={shareToken} />
+      </Suspense>
+    );
+  }
 
   return (
     <>

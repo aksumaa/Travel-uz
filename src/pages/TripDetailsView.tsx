@@ -6,6 +6,7 @@ import {
   Check, X, FileText, CheckCircle2, RefreshCw
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { api } from '../services/api';
 
 // Declare global types for Google Maps namespace
 declare global {
@@ -390,27 +391,16 @@ export const TripDetailsView: React.FC<TripDetailsViewProps> = ({ tripId, onBack
       localStorage.setItem('travel_uz_ai_trips', JSON.stringify(filtered));
     }
 
-    // 2. Sync Supabase
-    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-    const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    if (SUPABASE_URL && SUPABASE_KEY && !String(updatedTrip.id).startsWith('t-')) {
-      try {
-        await fetch(`${SUPABASE_URL}/rest/v1/trips?id=eq.${updatedTrip.id}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`
-          },
-          body: JSON.stringify({
-            title: updatedTrip.destination,
-            total_cost: totalSpent,
-            trip_data: updatedTrip.rawTripData
-          })
+    // 2. Sync FastAPI backend
+    try {
+      if (updatedTrip.id && !String(updatedTrip.id).startsWith('t-') && !String(updatedTrip.id).startsWith('ai-')) {
+        await api.put(`/trips/${updatedTrip.id}`, {
+          title: updatedTrip.destination,
+          content_json: updatedTrip.rawTripData
         });
-      } catch (err) {
-        console.warn('Supabase database sync offline:', err);
       }
+    } catch (err) {
+      console.warn('Backend database sync error:', err);
     }
   };
 
@@ -495,6 +485,12 @@ export const TripDetailsView: React.FC<TripDetailsViewProps> = ({ tripId, onBack
     downloadAnchor.remove();
   };
 
+  const handleDownloadBackendPdf = () => {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+    const pdfUrl = `${baseUrl}/trips/${tripId}/pdf`;
+    window.open(pdfUrl, '_blank');
+  };
+
   return (
     <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '24px' }}>
       
@@ -509,13 +505,17 @@ export const TripDetailsView: React.FC<TripDetailsViewProps> = ({ tripId, onBack
         </button>
 
         <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={handleDownloadBackendPdf} className="btn-primary" style={{ padding: '8px 16px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Download size={14} />
+            Download PDF
+          </button>
           <button onClick={handleCloneTrip} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <RefreshCw size={14} />
             {getLocalText('Clone Draft')}
           </button>
           <button onClick={handleExportPrint} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <FileText size={14} />
-            PDF / Print
+            Print Brochure
           </button>
           <button onClick={handleExportJson} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Download size={14} />
