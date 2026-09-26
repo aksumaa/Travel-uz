@@ -74,6 +74,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
   }, [initialView]);
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [selectedCountryId, setSelectedCountryId] = useState('uzbekistan');
+  const [selectedFeature, setSelectedFeature] = useState<any>(null);
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
 
@@ -124,6 +125,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
     { id: 'saved', label: t('dashboard.sidebarSaved'), icon: <Heart size={16} /> },
     { id: 'profile', label: t('dashboard.sidebarProfile'), icon: <User size={16} /> },
     { id: 'settings', label: t('dashboard.sidebarSettings'), icon: <Settings size={16} /> },
+    { id: 'admin', label: 'Admin Console', icon: <Shield size={16} /> },
+    { id: 'crm', label: 'CRM Leads', icon: <Users size={16} /> },
+    { id: 'analytics', label: 'Agency Analytics', icon: <TrendingUp size={16} /> },
+    { id: 'telegram', label: 'Telegram Bot', icon: <MessageSquare size={16} /> },
   ];
 
   const adminNav = [
@@ -149,18 +154,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
         { id: 'assistant', label: t('dashboard.sidebarAssistant'), icon: <MessageSquare size={18} /> },
         { id: 'profile', label: t('dashboard.sidebarProfile'), icon: <User size={18} /> },
       ];
-
-  // Mapped object representing current selected country for detail panel
-  const selectedCountryObj = {
-    properties: {
-      NAME: selectedCountryId === 'uzbekistan' ? 'Uzbekistan' : selectedCountryId === 'usa' ? 'United States' : selectedCountryId === 'france' ? 'France' : selectedCountryId === 'japan' ? 'Japan' : selectedCountryId === 'brazil' ? 'Brazil' : selectedCountryId === 'australia' ? 'Australia' : 'Egypt',
-      ISO_A3: selectedCountryId === 'uzbekistan' ? 'UZB' : selectedCountryId === 'usa' ? 'USA' : selectedCountryId === 'france' ? 'FRA' : selectedCountryId === 'japan' ? 'JPN' : selectedCountryId === 'brazil' ? 'BRA' : selectedCountryId === 'australia' ? 'AUS' : 'EGY',
-      SUBREGION: selectedCountryId === 'uzbekistan' ? 'Central Asia' : selectedCountryId === 'usa' ? 'North America' : selectedCountryId === 'france' ? 'Western Europe' : selectedCountryId === 'japan' ? 'Eastern Asia' : selectedCountryId === 'brazil' ? 'South America' : selectedCountryId === 'australia' ? 'Oceania' : 'Northern Africa',
-      CONTINENT: selectedCountryId === 'uzbekistan' ? 'Asia' : selectedCountryId === 'usa' ? 'North America' : selectedCountryId === 'france' ? 'Europe' : selectedCountryId === 'japan' ? 'Asia' : selectedCountryId === 'brazil' ? 'South America' : selectedCountryId === 'australia' ? 'Oceania' : 'Africa',
-      POP_EST: 35000000,
-      GDP_MD: 60000,
-    }
-  };
 
   const [showOnboardModal, setShowOnboardModal] = useState(false);
 
@@ -472,17 +465,29 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
                     <button onClick={() => setSelectedCountryId('uzbekistan')} style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Navigation size={12} /></button>
                   </div>
                   <Globe3D 
+                    compact
                     selectedCountryId={selectedCountryId}
                     onSelectCountry={(id) => setSelectedCountryId(id)}
+                    onSelectedFeature={setSelectedFeature}
                     onCreateTrip={() => handleTabChange('planner')}
                   />
                 </div>
-                <div className="glass-panel" style={{ height: '500px', background: 'var(--color-bg-surface)', border: '1px solid var(--glass-border)' }}>
-                  <CountryInfoPanel 
-                    country={selectedCountryObj}
-                    onClose={() => setSelectedCountryId('uzbekistan')}
-                    onCreateTrip={() => handleTabChange('planner')}
-                  />
+                <div className="glass-panel" style={{ height: '500px', background: 'var(--color-bg-surface)', border: '1px solid var(--glass-border)', position: 'relative', overflow: 'hidden' }}>
+                  {selectedFeature ? (
+                    <CountryInfoPanel 
+                      embedded
+                      country={selectedFeature}
+                      onClose={() => {
+                        setSelectedFeature(null);
+                        setSelectedCountryId('');
+                      }}
+                      onCreateTrip={() => handleTabChange('planner')}
+                    />
+                  ) : (
+                    <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', padding: '24px', textAlign: 'center' }}>
+                      Click a country on the globe to see its details.
+                    </div>
+                  )}
                 </div>
               </div>
 

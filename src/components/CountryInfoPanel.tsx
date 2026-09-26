@@ -37,6 +37,7 @@ interface CountryInfoPanelProps {
   country: CountryData | { properties: { NAME: string; [key: string]: any } } | null;
   onClose: () => void;
   onCreateTrip?: (country: any) => void;
+  embedded?: boolean;
 }
 
 // Complete metadata dictionary for the core selectable countries
@@ -303,10 +304,63 @@ const getResolvedCountryData = (country: any, defaultSubregion = 'Global'): Coun
   };
 };
 
-export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({ country, onClose, onCreateTrip }) => {
+export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({ country, onClose, onCreateTrip, embedded = false }) => {
   if (!country) return null;
 
-  const { t } = useTranslation();
+  const { language } = useTranslation();
+  const drawer = {
+    uz: {
+      capital: 'Poytaxt',
+      language: 'Til',
+      currency: 'Valyuta',
+      timezone: 'Vaqt mintaqasi',
+      weather: 'Ob-havo',
+      bestSeason: 'Eng yaxshi mavsum',
+      visaInfo: 'Viza',
+      aboutCountry: 'Mamlakat haqida',
+      topAttractions: 'Mashhur joylar',
+      popularFoods: 'Mashhur taomlar',
+      createTripBtn: 'Sayohat yaratish',
+    },
+    ru: {
+      capital: 'Столица',
+      language: 'Язык',
+      currency: 'Валюта',
+      timezone: 'Часовой пояс',
+      weather: 'Погода',
+      bestSeason: 'Лучший сезон',
+      visaInfo: 'Виза',
+      aboutCountry: 'О стране',
+      topAttractions: 'Главные места',
+      popularFoods: 'Популярные блюда',
+      createTripBtn: 'Создать поездку',
+    },
+    en: {
+      capital: 'Capital',
+      language: 'Language',
+      currency: 'Currency',
+      timezone: 'Timezone',
+      weather: 'Weather',
+      bestSeason: 'Best season',
+      visaInfo: 'Visa',
+      aboutCountry: 'About the country',
+      topAttractions: 'Top attractions',
+      popularFoods: 'Popular foods',
+      createTripBtn: 'Create trip',
+    },
+  }[language] || {
+    capital: 'Capital',
+    language: 'Language',
+    currency: 'Currency',
+    timezone: 'Timezone',
+    weather: 'Weather',
+    bestSeason: 'Best season',
+    visaInfo: 'Visa',
+    aboutCountry: 'About the country',
+    topAttractions: 'Top attractions',
+    popularFoods: 'Popular foods',
+    createTripBtn: 'Create trip',
+  };
   
   // Extract values
   const rawSubregion = (country as any).properties ? ((country as any).properties.SUBREGION || (country as any).properties.CONTINENT) : 'Global';
@@ -405,6 +459,17 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({ country, onC
           overflow-y: auto;
           scrollbar-width: thin;
         }
+        .country-info-panel-container.embedded {
+          position: relative !important;
+          inset: auto !important;
+          width: 100% !important;
+          height: 100% !important;
+          max-height: none !important;
+          border-left: none !important;
+          border-radius: 0 !important;
+          box-shadow: none !important;
+          padding-bottom: 24px !important;
+        }
         .dark-theme .country-info-panel-container {
           background: var(--glass-bg, rgba(19, 27, 49, 0.6)) !important;
           border-left: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08)) !important;
@@ -478,7 +543,7 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({ country, onC
           transform: scale(1.08);
         }
         @media (max-width: 768px) {
-          .country-info-panel-container {
+          .country-info-panel-container:not(.embedded) {
             top: auto !important;
             bottom: 0px !important;
             left: 0px !important;
@@ -498,7 +563,7 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({ country, onC
         animate={{ x: 0, opacity: 1 }}
         exit={{ x: 300, opacity: 0 }}
         transition={{ type: 'spring', damping: 28, stiffness: 240 }}
-        className="country-info-panel-container"
+        className={`country-info-panel-container${embedded ? ' embedded' : ''}`}
       >
         {/* Header Navigation */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--glass-border, rgba(15, 23, 42, 0.08))', paddingBottom: '16px' }}>
@@ -566,28 +631,28 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({ country, onC
           <div className="panel-metric-card">
             <Globe size={16} style={{ color: 'var(--color-accent, #1a73e8)' }} />
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted, #64748b)', textTransform: 'uppercase', fontWeight: 800 }}>{t('globeDrawer.capital')}</span>
+              <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted, #64748b)', textTransform: 'uppercase', fontWeight: 800 }}>{drawer.capital}</span>
               <strong style={{ fontSize: '0.9rem', fontWeight: 800 }}>{meta.capital}</strong>
             </div>
           </div>
           <div className="panel-metric-card">
             <Languages size={16} style={{ color: '#8b5cf6' }} />
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted, #64748b)', textTransform: 'uppercase', fontWeight: 800 }}>{t('globeDrawer.language')}</span>
+              <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted, #64748b)', textTransform: 'uppercase', fontWeight: 800 }}>{drawer.language}</span>
               <strong style={{ fontSize: '0.9rem', fontWeight: 800 }}>{meta.language}</strong>
             </div>
           </div>
           <div className="panel-metric-card">
             <DollarSign size={16} style={{ color: '#10b981' }} />
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted, #64748b)', textTransform: 'uppercase', fontWeight: 800 }}>{t('globeDrawer.currency')}</span>
+              <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted, #64748b)', textTransform: 'uppercase', fontWeight: 800 }}>{drawer.currency}</span>
               <strong style={{ fontSize: '0.9rem', fontWeight: 800 }}>{meta.currency}</strong>
             </div>
           </div>
           <div className="panel-metric-card">
             <Clock size={16} style={{ color: '#f59e0b' }} />
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted, #64748b)', textTransform: 'uppercase', fontWeight: 800 }}>{t('globeDrawer.timezone')}</span>
+              <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted, #64748b)', textTransform: 'uppercase', fontWeight: 800 }}>{drawer.timezone}</span>
               <strong style={{ fontSize: '0.9rem', fontWeight: 800 }}>{meta.timezone}</strong>
             </div>
           </div>
@@ -598,14 +663,14 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({ country, onC
           <div className="detail-badge-pill">
             {getWeatherIcon(meta.weather.condition)}
             <strong style={{ fontSize: '0.82rem', fontWeight: 800 }}>{meta.weather.temp}°C</strong>
-            <span style={{ fontSize: '0.58rem', color: 'var(--color-text-muted, #64748b)', textTransform: 'uppercase', fontWeight: 700 }}>{t('globeDrawer.weather')}</span>
+            <span style={{ fontSize: '0.58rem', color: 'var(--color-text-muted, #64748b)', textTransform: 'uppercase', fontWeight: 700 }}>{drawer.weather}</span>
           </div>
           <div className="detail-badge-pill">
             <Calendar size={18} style={{ color: '#ec4899' }} />
             <strong style={{ fontSize: '0.74rem', fontWeight: 800, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', width: '100%' }} title={meta.bestTime}>
               {meta.bestTime.split(',')[0]}
             </strong>
-            <span style={{ fontSize: '0.58rem', color: 'var(--color-text-muted, #64748b)', textTransform: 'uppercase', fontWeight: 700 }}>{t('globeDrawer.bestSeason')}</span>
+            <span style={{ fontSize: '0.58rem', color: 'var(--color-text-muted, #64748b)', textTransform: 'uppercase', fontWeight: 700 }}>{drawer.bestSeason}</span>
           </div>
           <div className="detail-badge-pill" style={{ 
             background: visaColors.bg, 
@@ -615,14 +680,14 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({ country, onC
             <strong style={{ fontSize: '0.74rem', fontWeight: 800, color: visaColors.color, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', width: '100%' }}>
               {meta.visa}
             </strong>
-            <span style={{ fontSize: '0.58rem', color: 'var(--color-text-muted, #64748b)', textTransform: 'uppercase', fontWeight: 700 }}>{t('globeDrawer.visaInfo')}</span>
+            <span style={{ fontSize: '0.58rem', color: 'var(--color-text-muted, #64748b)', textTransform: 'uppercase', fontWeight: 700 }}>{drawer.visaInfo}</span>
           </div>
         </div>
 
         {/* Description & Sparkles AI Action */}
         <div style={{ textAlign: 'left' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: '6px', fontFamily: "'Outfit', sans-serif" }}>
-            {t('globeDrawer.aboutCountry')}
+            {drawer.aboutCountry}
           </h3>
           <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary, #475569)', lineHeight: 1.5, margin: 0 }}>
             {meta.description}
@@ -671,7 +736,7 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({ country, onC
         <div style={{ textAlign: 'left' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: 800, margin: 0, fontFamily: "'Outfit', sans-serif" }}>
-              {t('globeDrawer.topAttractions')}
+              {drawer.topAttractions}
             </h3>
             <button style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-accent, #1a73e8)', background: 'none', border: 'none', cursor: 'pointer' }}>
               See all
@@ -708,7 +773,7 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({ country, onC
         <div style={{ textAlign: 'left' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: 800, margin: 0, fontFamily: "'Outfit', sans-serif" }}>
-              {t('globeDrawer.popularFoods')}
+              {drawer.popularFoods}
             </h3>
             <button style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-accent, #1a73e8)', background: 'none', border: 'none', cursor: 'pointer' }}>
               See all
@@ -763,7 +828,7 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({ country, onC
             onMouseLeave={(e) => e.currentTarget.style.background = 'var(--color-accent, #1a73e8)'}
           >
             <Compass size={16} /> 
-            {t('globeDrawer.createTripBtn')}
+            {drawer.createTripBtn}
           </button>
         </div>
       </motion.div>

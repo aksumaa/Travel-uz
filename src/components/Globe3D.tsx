@@ -19,6 +19,7 @@ interface GlobeProps {
   selectedCountryId?: string | null;
   onSelectCountry?: (countryId: string) => void;
   onCreateTrip?: (country: any) => void;
+  onSelectedFeature?: (feature: any) => void;
 }
 
 export const Globe3D: React.FC<GlobeProps> = ({
@@ -27,7 +28,8 @@ export const Globe3D: React.FC<GlobeProps> = ({
   compact = false,
   selectedCountryId,
   onSelectCountry,
-  onCreateTrip
+  onCreateTrip,
+  onSelectedFeature
 }) => {
   
   // Resolve active states
@@ -37,6 +39,10 @@ export const Globe3D: React.FC<GlobeProps> = ({
   const [hoveredCountryFeature, setHoveredCountryFeature] = useState<any>(null);
   const [selectedCountryFeature, setSelectedCountryFeature] = useState<any>(null);
   const [autoRotate, setAutoRotate] = useState(true);
+
+  React.useEffect(() => {
+    onSelectedFeature?.(selectedCountryFeature);
+  }, [selectedCountryFeature, onSelectedFeature]);
 
   // Refs
   const autoRotateTimerRef = useRef<any>(null);

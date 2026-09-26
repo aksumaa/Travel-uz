@@ -10,7 +10,6 @@ export const AuthModal: React.FC = () => {
     showAuthModal, 
     setShowAuthModal, 
     login, 
-    logout,
     isLoading,
     signInWithGoogle,
     signInWithApple 
@@ -59,11 +58,6 @@ export const AuthModal: React.FC = () => {
       const saved = JSON.parse(localStorage.getItem('travel_uz_user') || '{}');
       const requested = localStorage.getItem('auth_redirect_path');
       localStorage.removeItem('auth_redirect_path');
-      if (requested === '/admin' && saved.role !== 'administrator' && saved.role !== 'admin') {
-        logout();
-        setErrorMsg('That account is a traveler. Use admin@traveluz.com to open the admin panel.');
-        return;
-      }
       const dest = requested || (saved.role === 'administrator' || saved.role === 'admin' ? '/admin' : '/dashboard');
       setSuccessMsg(t('auth.successLogin'));
       setTimeout(() => {

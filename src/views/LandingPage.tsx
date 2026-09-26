@@ -187,7 +187,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartPlanning }) => 
           opacity: 0.85
         }}>
           <Globe3D 
-            selectedCountryId="uzbekistan"
+            compact
+            selectedCountryId={null}
             onSelectCountry={() => {}}
             onCreateTrip={() => handleAuthGate('planner')}
           />
