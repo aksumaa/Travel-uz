@@ -84,7 +84,7 @@ export const PublicItineraryView: React.FC<PublicItineraryViewProps> = ({ shareT
           <h2 style={{ color: 'var(--color-text-primary)', marginBottom: '8px' }}>Link Expired or Not Found</h2>
           <p style={{ color: 'var(--color-text-muted)', marginBottom: '20px' }}>{error}</p>
           <a href="/" className="btn-primary" style={{ display: 'inline-block', padding: '10px 20px', textDecoration: 'none', borderRadius: '10px', fontWeight: 700 }}>
-            Back to TravelUZ
+            Back to TripMind
           </a>
         </div>
       </div>

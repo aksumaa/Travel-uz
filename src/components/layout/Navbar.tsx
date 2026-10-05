@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plane, Sun, Moon, LogOut, Calendar, Menu, X, ChevronDown, LayoutDashboard } from 'lucide-react';
+import { Plane, Sun, Moon, LogOut, Calendar, Menu, X, ChevronDown, LayoutDashboard, Compass } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -100,17 +100,29 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
         onClick={onNavigateHome}
         style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
       >
-        <Plane size={24} className="animate-float" style={{ color: 'var(--accent)', transform: 'rotate(45deg)' }} />
+        <div style={{
+          width: '32px',
+          height: '32px',
+          borderRadius: '10px',
+          background: 'linear-gradient(135deg, var(--accent, #2563eb), #7c3aed)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#ffffff',
+          boxShadow: '0 4px 14px rgba(37, 99, 235, 0.4)'
+        }}>
+          <Compass size={18} />
+        </div>
         <span
           style={{
             fontFamily: "'Outfit', sans-serif",
             fontWeight: 800,
-            fontSize: '1.4rem',
-            letterSpacing: '1px',
+            fontSize: '1.35rem',
+            letterSpacing: '0.5px',
             color: 'var(--text-primary)',
           }}
         >
-          Travel<span style={{ color: '#2563EB', fontWeight: 900 }}>UZ</span>
+          Trip<span style={{ color: '#2563EB', fontWeight: 900 }}>Mind</span>
         </span>
       </div>
 

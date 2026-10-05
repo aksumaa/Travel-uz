@@ -1,26 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api, setAuthToken, removeAuthToken, getAuthToken } from '../services/api';
+import type { User, AgencyInfo } from '../types';
 
-export interface AgencyInfo {
-  id: number;
-  name: string;
-  logo_url?: string;
-  contact_email?: string;
-  contact_phone?: string;
-  subscription_tier: string;
-  has_telegram_bot?: boolean;
-  telegram_chat_id?: string;
-}
-
-export interface User {
-  id: string | number;
-  name: string;
-  email: string;
-  avatar: string;
-  role?: string;
-  agency_id?: number | null;
-  agency?: AgencyInfo | null;
-}
+export type { User, AgencyInfo };
 
 interface AuthContextProps {
   user: User | null;

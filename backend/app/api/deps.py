@@ -9,17 +9,24 @@ from sqlalchemy.future import select
 
 from app.config import settings
 from app.db.session import get_db
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.models.agency import Agency, AgencyMember
+from app.models.guide import Guide
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+import bcrypt
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login", auto_error=False)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return bcrypt.checkpw(plain_password.encode("utf-8")[:72], hashed_password.encode("utf-8"))
+    except Exception:
+        return False
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    pwd_bytes = password.encode("utf-8")[:72]
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(pwd_bytes, salt).decode("utf-8")
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
@@ -34,6 +41,24 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) 
     to_encode.update({"exp": expire, "type": "refresh"})
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
+
+async def get_current_user_optional(
+    token: Optional[str] = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db)
+) -> Optional[User]:
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.ALGORITHM])
+        user_id_str: str = payload.get("sub")
+        token_type: str = payload.get("type")
+        if user_id_str is None or token_type != "access":
+            return None
+        user_id = int(user_id_str)
+        result = await db.execute(select(User).where(User.id == user_id, User.is_active == True))
+        return result.scalars().first()
+    except Exception:
+        return None
 
 async def get_current_user(
     token: Optional[str] = Depends(oauth2_scheme),
@@ -66,11 +91,23 @@ async def get_current_user(
     user = result.scalars().first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User account is deactivated")
     return user
 
 def require_roles(allowed_roles: List[str]):
-    async def role_checker(current_user: User = Depends(get_current_user)):
-        if current_user.role not in allowed_roles:
+    normalized = [r.upper() for r in allowed_roles]
+    # Add alias mappings
+    if "AGENCY" in normalized:
+        normalized.extend(["AGENCY_OWNER", "AGENCY_STAFF"])
+    if "USER" in normalized:
+        normalized.extend(["CLIENT"])
+
+    async def role_checker(current_user: User = Depends(get_current_user)) -> User:
+        user_role = current_user.role.upper()
+        if user_role == "ADMIN":
+            return current_user # Admin has superuser privileges
+        if user_role not in normalized:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Operation not permitted. Required roles: {allowed_roles}"
@@ -99,3 +136,16 @@ async def get_current_agency(
             detail="Current user is not associated with any tour agency. Please complete agency onboarding first."
         )
     return agency
+
+async def get_current_guide(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+) -> Guide:
+    result = await db.execute(select(Guide).where(Guide.user_id == current_user.id))
+    guide = result.scalars().first()
+    if not guide:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Current user does not have a registered guide profile."
+        )
+    return guide

@@ -171,90 +171,40 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartPlanning }) => 
           zIndex: 10
         }}
       >
-        {/* Globe3D Behind Text */}
-        <div style={{
-          position: 'absolute',
-          top: '15vh',
-          left: 0,
-          width: '100%',
-          height: '70vh',
-          zIndex: 1,
-          pointerEvents: 'auto',
-          opacity: 0.85
-        }}>
-          <Globe3D 
-            selectedCountryId="uzbekistan"
-            onSelectCountry={() => {}}
-            onCreateTrip={() => handleAuthGate('planner')}
-          />
-        </div>
-
-        {/* Floating airplane SVGs (3 planes animating along paths) */}
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 2, opacity: 0.35 }}>
-          {/* Plane 1 */}
-          <svg style={{ width: '100%', height: '100%', position: 'absolute' }}>
-            <path id="planePath1" fill="none" stroke="none" d="M -50 200 Q 300 50 600 300 T 1300 100" />
-            <path id="planePath2" fill="none" stroke="none" d="M -50 600 Q 500 800 900 400 T 1500 500" />
-            <path id="planePath3" fill="none" stroke="none" d="M 1200 800 Q 600 400 300 900 T -50 700" />
-            
-            <g>
-              <path d="M 0,-5 L 10,0 L 0,5 L 2,0 Z" fill="var(--color-accent)">
-                <animateMotion dur="18s" repeatCount="indefinite" rotate="auto">
-                  <mpath href="#planePath1" />
-                </animateMotion>
-              </path>
-            </g>
-            <g>
-              <path d="M 0,-5 L 10,0 L 0,5 L 2,0 Z" fill="var(--color-purple)">
-                <animateMotion dur="24s" repeatCount="indefinite" rotate="auto">
-                  <mpath href="#planePath2" />
-                </animateMotion>
-              </path>
-            </g>
-            <g>
-              <path d="M 0,-5 L 10,0 L 0,5 L 2,0 Z" fill="var(--color-accent-gold)">
-                <animateMotion dur="30s" repeatCount="indefinite" rotate="auto">
-                  <mpath href="#planePath3" />
-                </animateMotion>
-              </path>
-            </g>
-          </svg>
-        </div>
-
-        {/* Centered text overlay */}
+        {/* Hero Top Title & Value Proposition */}
         <div style={{
           position: 'relative',
-          zIndex: 3,
+          zIndex: 10,
           textAlign: 'center',
           maxWidth: '850px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: '24px',
-          pointerEvents: 'none'
+          gap: '16px',
+          marginBottom: '28px'
         }}>
           {/* Badge */}
           <span style={{
-            background: 'var(--color-accent-glow)',
-            color: 'var(--color-accent)',
-            padding: '8px 20px',
+            background: 'rgba(37, 99, 235, 0.12)',
+            color: '#60A5FA',
+            padding: '6px 18px',
             borderRadius: '100px',
-            fontSize: '0.8rem',
+            fontSize: '0.78rem',
             fontWeight: 800,
             letterSpacing: '1px',
             textTransform: 'uppercase',
-            border: '1px solid var(--glass-border)',
+            border: '1px solid rgba(37, 99, 235, 0.3)',
             display: 'inline-flex',
             alignItems: 'center',
             gap: '6px'
           }}>
-            ✨ AI-Powered Travel Platform
+            <Sparkles size={14} /> Global AI Travel Platform
           </span>
 
-          {/* Heading */}
+          {/* Headline */}
           <h1 className="text-gradient" style={{
             fontFamily: 'var(--font-heading)',
-            fontSize: '3.8rem',
+            fontSize: 'clamp(2.4rem, 5vw, 3.8rem)',
             fontWeight: 900,
             lineHeight: 1.15,
             letterSpacing: '-1.5px',
@@ -266,30 +216,38 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartPlanning }) => 
           {/* Subtitle */}
           <p style={{
             color: 'var(--color-text-secondary)',
-            fontSize: '1.2rem',
+            fontSize: 'clamp(0.95rem, 2vw, 1.15rem)',
             lineHeight: 1.6,
-            maxWidth: '620px',
+            maxWidth: '640px',
             margin: 0
           }}>
-            {t('hero.subheadline')}
+            Explore global destinations on the interactive 3D Earth. Search cities, follow realistic flight paths, and craft tailored itineraries with AI intelligence.
           </p>
+        </div>
 
-          {/* Action buttons */}
-          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '12px', pointerEvents: 'auto' }}>
-            <button 
-              onClick={() => handleAuthGate('planner')}
-              className="btn-premium"
-              style={{ border: 'none' }}
-            >
-              {t('landing.heroCta')}
-            </button>
-            <a 
-              href="#destinations"
-              className="btn-secondary"
-            >
-              {t('landing.heroExplore')}
-            </a>
-          </div>
+        {/* INTERACTIVE 3D EARTH GLOBE ARENA */}
+        <div style={{
+          position: 'relative',
+          zIndex: 5,
+          width: '100%',
+          maxWidth: '1240px',
+          height: '620px',
+          borderRadius: '28px',
+          border: '1px solid var(--glass-border)',
+          background: 'radial-gradient(circle at 50% 50%, rgba(13, 21, 39, 0.7) 0%, rgba(6, 9, 20, 0.95) 100%)',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.45)',
+          overflow: 'hidden'
+        }}>
+          <Globe3D 
+            selectedCountryId="uzbekistan"
+            showSearchBar={true}
+            onSelectCountry={(id) => {
+              // Country selected on globe
+            }}
+            onCreateTrip={(dest) => {
+              handleAuthGate('planner');
+            }}
+          />
         </div>
       </motion.section>
 

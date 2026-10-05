@@ -162,14 +162,17 @@ export interface TranslationDictionary {
     subtitle: string;
   };
   dashboard: {
+    home: string;
     explore: string;
     planner: string;
     myTrips: string;
+    tours: string;
     readyTrips: string;
     flights: string;
     hotels: string;
     attractions: string;
     saved: string;
+    community: string;
     assistant: string;
     profile: string;
     settings: string;
@@ -295,7 +298,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     howItWorks: {
       title: 'Qanday ishlaydi?',
       subtitle: 'Atigi bir necha qadam orqali o\'zingizga mos sayohatni yarating.',
-      step1Title: '🌍 TravelUZ ga kiring yoki akkaunt yarating',
+      step1Title: '🌍 TripMind ga kiring yoki akkaunt yarating',
       step1Desc: 'Google, Apple yoki email orqali bir necha soniyada ro\'yxatdan o\'ting.',
       step2Title: '🤖 AI yordamida Dream Trip yarating',
       step2Desc: 'Sun\'iy intellekt sizning byudjetingiz, qiziqishlaringiz va sanalaringiz asosida ideal sayohat yaratadi.',
@@ -306,11 +309,11 @@ export const translations: Record<Language, TranslationDictionary> = {
       step5Title: '🧳 Shaxsiy marshrutingizni saqlang',
       step5Desc: 'Barcha rejalaringiz akkauntingizda xavfsiz saqlanadi.',
       step6Title: '🌟 Sayohatdan zavqlaning',
-      step6Desc: 'TravelUZ bilan unutilmas sarguzashtlarni boshlang.',
+      step6Desc: 'TripMind bilan unutilmas sarguzashtlarni boshlang.',
     },
     why: {
-      title: 'Nima uchun aynan TravelUZ?',
-      subtitle: 'TravelUZ har bir sayohatchi uchun individual va zamonaviy sayohat tajribasini yaratadi.',
+      title: 'Nima uchun aynan TripMind?',
+      subtitle: 'TripMind har bir sayohatchi uchun individual va zamonaviy sayohat tajribasini yaratadi.',
       card1Title: '🤖 AI Dream Planner',
       card1Desc: 'Shaxsiy qiziqishlaringiz asosida ideal sayohat yaratadi.',
       card2Title: '🌍 Individual Marshrutlar',
@@ -330,7 +333,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     },
     userStories: {
       title: 'Sayohatchilar qanday foydalanadi?',
-      subtitle: 'TravelUZ bilan minglab foydalanuvchilar o\'z orzularidagi sayohatni yaratmoqda.',
+      subtitle: 'TripMind bilan minglab foydalanuvchilar o\'z orzularidagi sayohatni yaratmoqda.',
       card1Title: 'Akkaunt yarating',
       card1Desc: 'Bir necha soniyada ro\'yxatdan o\'ting va shaxsiy profilingizni yarating.',
       card2Title: 'Dream Trip yarating',
@@ -345,7 +348,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       secondaryButton: 'AI bilan yaratish',
     },
     appDownload: {
-      title: 'TravelUZ mobil ilovasini yuklab oling',
+      title: 'TripMind mobil ilovasini yuklab oling',
       subtitle: 'Sayohat rejalaringizni istalgan joyda boshqaring, offline foydalaning va real vaqt bildirishnomalarini qabul qiling.',
     },
     footer: {
@@ -372,17 +375,20 @@ export const translations: Record<Language, TranslationDictionary> = {
       terms: 'Foydalanish shartlari',
       privacy: 'Maxfiylik siyosati',
       welcome: 'Xush kelibsiz',
-      subtitle: 'TravelUZ orqali dunyo sayohatlarini osonlashtiring.',
+      subtitle: 'TripMind orqali dunyo sayohatlarini osonlashtiring.',
     },
     dashboard: {
-      explore: 'Yo‘nalishlar',
-      planner: 'AI Sayohat Planner',
+      home: 'Bosh sahifa',
+      explore: 'Kashf etish',
+      planner: 'AI Planner',
       myTrips: 'Sayohatlarim',
+      tours: 'Tayyor turlar',
       readyTrips: 'Tayyor turlar',
       flights: 'Aviachiptalar',
       hotels: 'Mehmonxonalar',
       attractions: 'Diqqatga sazovor joylar',
       saved: 'Saqlanganlar',
+      community: 'Hamjamiyat',
       assistant: 'AI Yordamchi',
       profile: 'Profilim',
       settings: 'Sozlamalar',
@@ -506,7 +512,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     howItWorks: {
       title: 'Как это работает?',
       subtitle: 'Создайте свое идеальное путешествие всего за несколько простых шагов.',
-      step1Title: '🌍 Войдите или создайте аккаунт в TravelUZ',
+      step1Title: '🌍 Войдите или создайте аккаунт в TripMind',
       step1Desc: 'Зарегистрируйтесь за пару секунд через Google, Apple или почту.',
       step2Title: '🤖 Создайте Dream Trip с помощью ИИ',
       step2Desc: 'Искусственный интеллект разработает идеальный маршрут на основе вашего бюджета, интересов и дат.',
@@ -517,11 +523,11 @@ export const translations: Record<Language, TranslationDictionary> = {
       step5Title: '🧳 Сохраняйте личные маршруты',
       step5Desc: 'Все ваши планы и поездки будут надежно сохранены в вашем профиле.',
       step6Title: '🌟 Наслаждайтесь путешествием',
-      step6Desc: 'Начните свое незабываемое приключение вместе с TravelUZ.',
+      step6Desc: 'Начните свое незабываемое приключение вместе с TripMind.',
     },
     why: {
-      title: 'Почему именно TravelUZ?',
-      subtitle: 'TravelUZ создает уникальный и современный опыт путешествий для каждого.',
+      title: 'Почему именно TripMind?',
+      subtitle: 'TripMind создает уникальный и современный опыт путешествий для каждого.',
       card1Title: '🤖 AI Dream Planner',
       card1Desc: 'Создает идеальные поездки на основе ваших персональных предпочтений.',
       card2Title: '🌍 Индивидуальные маршруты',
@@ -541,7 +547,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     },
     userStories: {
       title: 'Как путешественники используют сервис?',
-      subtitle: 'Тысячи пользователей уже создают свои поездки мечты вместе с TravelUZ.',
+      subtitle: 'Тысячи пользователей уже создают свои поездки мечты вместе с TripMind.',
       card1Title: 'Создайте аккаунт',
       card1Desc: 'Зарегистрируйтесь за несколько секунд и настройте свой профиль.',
       card2Title: 'Создайте Dream Trip',
@@ -556,7 +562,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       secondaryButton: 'Создать с помощью ИИ',
     },
     appDownload: {
-      title: 'Скачайте мобильное приложение TravelUZ',
+      title: 'Скачайте мобильное приложение TripMind',
       subtitle: 'Управляйте планами поездок в любом месте, пользуйтесь офлайн-доступом и получайте уведомления в реальном времени.',
     },
     footer: {
@@ -583,17 +589,20 @@ export const translations: Record<Language, TranslationDictionary> = {
       terms: 'Условия использования',
       privacy: 'Политика конфиденциальности',
       welcome: 'С возвращением',
-      subtitle: 'Сделайте планирование поездок простым с TravelUZ.',
+      subtitle: 'Сделайте планирование поездок простым с TripMind.',
     },
     dashboard: {
-      explore: 'Направления',
+      home: 'Главная',
+      explore: 'Исследовать',
       planner: 'ИИ-Планировщик',
       myTrips: 'Мои поездки',
+      tours: 'Туры',
       readyTrips: 'Готовые туры',
       flights: 'Авиабилеты',
       hotels: 'Отели',
       attractions: 'Интересные места',
       saved: 'Избранное',
+      community: 'Сообщество',
       assistant: 'ИИ-Помощник',
       profile: 'Мой профиль',
       settings: 'Настройки',
@@ -717,7 +726,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     howItWorks: {
       title: 'How It Works?',
       subtitle: 'Create your custom itinerary in just a few steps.',
-      step1Title: '🌍 Sign in or create a TravelUZ account',
+      step1Title: '🌍 Sign in or create a TripMind account',
       step1Desc: 'Sign up in seconds via Google, Apple, or email.',
       step2Title: '🤖 Create a Dream Trip with AI',
       step2Desc: 'AI crafts your ideal travel itinerary based on your budget, interests, and dates.',
@@ -728,11 +737,11 @@ export const translations: Record<Language, TranslationDictionary> = {
       step5Title: '🧳 Save your personal route',
       step5Desc: 'All your plans are securely saved in your personal account.',
       step6Title: '🌟 Enjoy your journey',
-      step6Desc: 'Embark on unforgettable adventures with TravelUZ.',
+      step6Desc: 'Embark on unforgettable adventures with TripMind.',
     },
     why: {
-      title: 'Why choose TravelUZ?',
-      subtitle: 'TravelUZ delivers a customized and modern travel experience for every explorer.',
+      title: 'Why choose TripMind?',
+      subtitle: 'TripMind delivers a customized and modern travel experience for every explorer.',
       card1Title: '🤖 AI Dream Planner',
       card1Desc: 'Generates the ideal trip tailored to your individual interests.',
       card2Title: '🌍 Individual Routes',
@@ -752,7 +761,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     },
     userStories: {
       title: 'How do travelers use it?',
-      subtitle: 'Thousands of users are crafting their dream vacations with TravelUZ.',
+      subtitle: 'Thousands of users are crafting their dream vacations with TripMind.',
       card1Title: 'Create an account',
       card1Desc: 'Register in a matter of seconds and build your custom profile.',
       card2Title: 'Generate Dream Trip',
@@ -767,7 +776,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       secondaryButton: 'Create with AI',
     },
     appDownload: {
-      title: 'Download the TravelUZ mobile app',
+      title: 'Download the TripMind mobile app',
       subtitle: 'Manage your travel plans anywhere, use it offline, and receive real-time notifications.',
     },
     footer: {
@@ -794,20 +803,23 @@ export const translations: Record<Language, TranslationDictionary> = {
       terms: 'Terms of Service',
       privacy: 'Privacy Policy',
       welcome: 'Welcome Back',
-      subtitle: 'Unlock seamless custom travel workflows with TravelUZ.',
+      subtitle: 'Unlock seamless custom travel workflows with TripMind.',
     },
     dashboard: {
-      explore: 'Destinations',
-      planner: 'AI Trip Planner',
+      home: 'Home',
+      explore: 'Explore',
+      planner: 'AI Planner',
       myTrips: 'My Trips',
-      readyTrips: 'Ready Trips',
+      tours: 'Tours',
+      readyTrips: 'Ready Tours',
       flights: 'Flight Search',
       hotels: 'Hotel Search',
       attractions: 'Points of Interest',
-      saved: 'Saved Catalog',
+      saved: 'Saved Vault',
+      community: 'Community',
       assistant: 'AI Copilot',
-      profile: 'User Profile',
-      settings: 'Settings Control',
+      profile: 'Profile',
+      settings: 'Settings',
       goPremium: 'Go Premium',
       upgrade: 'Upgrade Now',
     },

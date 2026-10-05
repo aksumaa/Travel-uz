@@ -67,7 +67,7 @@ export const Footer: React.FC = () => {
                 color: 'var(--text-primary)',
               }}
             >
-              Travel<span style={{ color: '#2563EB', fontWeight: 900 }}>UZ</span>
+              Trip<span style={{ color: '#2563EB', fontWeight: 900 }}>Mind</span>
             </span>
           </div>
           <p style={{ fontSize: '0.85rem', lineHeight: 1.6, maxWidth: '280px', color: 'var(--text-muted)' }}>
@@ -339,7 +339,7 @@ export const Footer: React.FC = () => {
         }}
       >
         <div>
-          © {new Date().getFullYear()} TravelUZ. {t('footer.copyright')}
+          © {new Date().getFullYear()} TripMind. {t('footer.copyright')}
         </div>
 
         {/* Back to Top button */}

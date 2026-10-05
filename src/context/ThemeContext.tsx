@@ -15,7 +15,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (saved === 'dark' || saved === 'light') {
       return saved as Theme;
     }
-    return 'dark'; // Default theme: DARK
+    return 'light'; // Default theme: LIGHT (TripMind design direction)
   });
 
   useEffect(() => {

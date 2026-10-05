@@ -12,6 +12,27 @@ dist
 dist-ssr
 *.local
 
+# Environment variables (CRITICAL: contains JWT secrets, API keys, encryption keys)
+.env
+.env.local
+.env.production
+.env.staging
+backend/.env
+
+# Database files (contains user data and password hashes)
+*.db
+*.sqlite
+*.sqlite3
+traveluz.db
+backend/traveluz.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

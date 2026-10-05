@@ -11,7 +11,7 @@ const LOADING_STEPS = [
   'Syncing orbital map coordinates...',
   'Connecting telemetry databases...',
   'Finalizing pre-flight checklists...',
-  'Welcome to TravelUZ.',
+  'Welcome to TripMind.',
 ];
 
 export const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {

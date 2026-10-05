@@ -7,6 +7,7 @@ import { AuthModal } from './components/AuthModal';
 import { ThemeProvider } from './context/ThemeContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { CurrencyProvider } from './context/CurrencyContext';
 
 // Lazy loaded page components
 const LandingPage = lazy(() => import('./pages/LandingPage').then(m => ({ default: m.LandingPage })));
@@ -42,6 +43,9 @@ function AppContent() {
     );
   }
 
+  // Show Dashboard if user is authenticated or interacting with dashboard tabs ('home', 'explore', 'planner', 'my-trips', 'tours', 'saved', etc.)
+  const showDashboard = Boolean(user) || dashboardView !== 'landing';
+
   return (
     <>
       <AnimatePresence>
@@ -62,8 +66,10 @@ function AppContent() {
             position: 'relative',
           }}
         >
-          {/* Global Header Navigation */}
-          {!user && <Navbar onNavigateHome={() => setDashboardView('home')} />}
+          {/* Global Header Navigation for Guest Landing */}
+          {!user && !showDashboard && (
+            <Navbar onNavigateHome={() => setDashboardView('landing')} />
+          )}
 
           {/* Conditional Layout Switching */}
           <div style={{ flex: 1, position: 'relative' }}>
@@ -75,9 +81,9 @@ function AppContent() {
                 </svg>
               </div>
             }>
-              {user ? (
+              {showDashboard ? (
                 <Dashboard
-                  initialView={dashboardView}
+                  initialView={dashboardView === 'landing' ? 'home' : dashboardView}
                   onViewChange={setDashboardView}
                 />
               ) : (
@@ -106,13 +112,14 @@ function AppContent() {
   );
 }
 
-
 function App() {
   return (
     <ThemeProvider>
       <LanguageProvider>
         <AuthProvider>
-          <AppContent />
+          <CurrencyProvider>
+            <AppContent />
+          </CurrencyProvider>
         </AuthProvider>
       </LanguageProvider>
     </ThemeProvider>

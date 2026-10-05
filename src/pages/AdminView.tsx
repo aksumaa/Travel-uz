@@ -48,7 +48,7 @@ export const AdminView: React.FC = () => {
 
   // AI Prompt config variables
   const [promptTemplate, setPromptTemplate] = useState(
-    `You are a helpful travel assistant for TravelUZ. Create a detailed itinerary for {{destination}} for {{duration}} days. Budget level: {{budget}}.`
+    `You are a helpful travel assistant for TripMind. Create a detailed itinerary for {{destination}} for {{duration}} days. Budget level: {{budget}}.`
   );
   const [temperature, setTemperature] = useState(0.7);
   const [modelType, setModelType] = useState('gpt-4o');

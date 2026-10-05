@@ -1,1191 +1,1396 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft, Calendar, User, Compass, Download, Plus, 
-  Trash2, Edit3, MapPin, Star, AlertTriangle, CloudRain, Wind, Thermometer, 
-  Check, X, FileText, CheckCircle2, RefreshCw
+  Trash2, Edit3, MapPin, Star, AlertTriangle, CloudRain, 
+  Wind, Thermometer, Check, X, FileText, CheckCircle2, 
+  RefreshCw, Shield, Sparkles, Coffee, Utensils, Hotel, 
+  Car, ShoppingBag, Music, Navigation, Share2, Layers, 
+  Zap, Clock, DollarSign, ChevronRight, Landmark 
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { api } from '../services/api';
-
-// Declare global types for Google Maps namespace
-declare global {
-  interface Window {
-    google: any;
-  }
-}
-declare var google: any;
+import { TripMap, type MapPoint } from '../components/TripMap';
+import { PlaceDetailModal, type PlaceDetailData } from '../components/PlaceDetailModal';
+import { ReadyToursSection } from '../components/ReadyToursSection';
+import type { ActivityCategory } from '../types/travel';
 
 interface TripDetailsViewProps {
   tripId: string;
   onBack: () => void;
 }
 
+type WorkspaceViewMode = 'timeline' | 'calendar' | 'map';
+
 export const TripDetailsView: React.FC<TripDetailsViewProps> = ({ tripId, onBack }) => {
-  const { language, t } = useLanguage();
-  
-  // Localized dictionary for component-specific terms
-  const getLocalText = (key: string) => {
-    const dict: Record<string, Record<'uz' | 'ru' | 'en', string>> = {
-      'Morning Plan': { en: 'Morning Plan', ru: 'Утренний план', uz: 'Ertamgi reja' },
-      'Afternoon Plan': { en: 'Afternoon Plan', ru: 'Дневной план', uz: 'Kunduzgi reja' },
-      'Evening Dining': { en: 'Evening Dining', ru: 'Вечерний ужин', uz: 'Kechki ovqat' },
-      'Lodging Stay': { en: 'Lodging Stay', ru: 'Проживание', uz: 'Turar joy' },
-      'Add Activity': { en: 'Add Activity', ru: 'Добавить активность', uz: 'Reja qo‘shish' },
-      'Activity Name': { en: 'Activity Name', ru: 'Название активности', uz: 'Faoliyat nomi' },
-      'Location': { en: 'Location', ru: 'Местоположение', uz: 'Manzil' },
-      'Duration': { en: 'Duration', ru: 'Длительность', uz: 'Davomiyligi' },
-      'Cost': { en: 'Cost', ru: 'Стоимость', uz: 'Narxi' },
-      'Notes/Tips': { en: 'Notes/Tips', ru: 'Заметки/Советы', uz: 'Eslatma/Maslahat' },
-      'Budget Limit': { en: 'Budget Limit', ru: 'Лимит бюджета', uz: 'Byudjet chegarasi' },
-      'Total Expenses': { en: 'Total Expenses', ru: 'Всего расходов', uz: 'Jami xarajatlar' },
-      'Remaining': { en: 'Remaining', ru: 'Осталось', uz: 'Qoldi' },
-      'Daily Weather Forecast': { en: 'Daily Weather Forecast', ru: 'Прогноз погоды', uz: 'Kunlik ob-havo' },
-      'Rain Probability': { en: 'Rain Probability', ru: 'Вероятность дождя', uz: 'Yog‘ingarchilik' },
-      'Wind Speed': { en: 'Wind Speed', ru: 'Скорость ветра', uz: 'Shamol tezligi' },
-      'Severe Alert': { en: 'Severe Alert: High temperature peak. Carry water.', ru: 'Предупреждение: Высокая температура. Пейте воду.', uz: 'Ogohlantirish: Yuqori issiqlik darajasi. Suv iching.' },
-      'Embassy': { en: 'Consular Assistance', ru: 'Консульство', uz: 'Konsullik ko‘mak' },
-      'Edit activity details': { en: 'Edit Activity Details', ru: 'Изменить детали', uz: 'Tahrirlash' },
-      'Save Itinerary Changes': { en: 'Save Itinerary Changes', ru: 'Сохранить изменения', uz: 'Marshrutni saqlash' },
-      'Regenerate Day Itinerary': { en: 'Regenerate Day Itinerary', ru: 'Пересоздать день с ИИ', uz: 'Kunni qayta tuzish' },
-      'Clone Draft': { en: 'Clone Draft', ru: 'Создать дубликат', uz: 'Nusxa olish' }
-    };
-    return dict[key]?.[language] || key;
-  };
+  const { formatPrice, currency } = useCurrency();
 
   const [trip, setTrip] = useState<any>(null);
   const [activeDayIdx, setActiveDayIdx] = useState(0);
-  
-  // Modals / Editors state
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingNode, setEditingNode] = useState<{ dayIdx: number; section: 'morning' | 'afternoon' | 'evening' | 'hotel'; data: any } | null>(null);
+  const [viewMode, setViewMode] = useState<WorkspaceViewMode>('timeline');
+  const [selectedPlaceForModal, setSelectedPlaceForModal] = useState<PlaceDetailData | null>(null);
+
+  // In-Trip Real-Time AI Adaptation Drawer State
+  const [showAdaptationDrawer, setShowAdaptationDrawer] = useState(false);
+  const [activeAdaptationPrompt, setActiveAdaptationPrompt] = useState<string | null>(null);
+  const [adaptationDiff, setAdaptationDiff] = useState<{
+    prompt: string;
+    reason: string;
+    removing: string[];
+    adding: string[];
+    costImpactUSD: number;
+    walkingSavedKm: number;
+  } | null>(null);
+
+  // Add Custom Activity Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [customActivity, setCustomActivity] = useState({
-    section: 'morning',
+    section: 'morning' as 'morning' | 'afternoon' | 'evening',
+    category: 'attraction' as ActivityCategory,
     activity: '',
     location: '',
     duration: '2 hours',
-    cost: 0,
+    cost: 10,
     tip: ''
   });
 
-  // Google Maps and dynamic route telemetry
-  const mapRef = useRef<HTMLDivElement>(null);
-  const [isMapLoaded, setIsMapLoaded] = useState(false);
-  const [hoveredLocation, setHoveredLocation] = useState<string | null>(null);
+  // Inline Title Editing
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editableTitle, setEditableTitle] = useState('');
 
-  // Load trip data from LocalStorage on mount
+  // Load trip from localStorage or backend
   useEffect(() => {
     const localTripsSaved = localStorage.getItem('travel_uz_ai_trips');
     if (localTripsSaved) {
       const parsed = JSON.parse(localTripsSaved);
       const found = parsed.find((t: any) => String(t.id) === String(tripId));
       if (found) {
-        // If there's no rawTripData (e.g. legacy mock trips), create one dynamically
         if (!found.rawTripData) {
           const daysCount = found.itinerary ? found.itinerary.length : 3;
           found.rawTripData = {
             title: found.destination,
-            summary: `Premium detailed schedule planned for ${found.travelers || 2} travelers. Custom style: ${found.style || 'Adventure'}.`,
+            summary: `Tailored itinerary for ${found.travelers || 2} travelers. Style: ${found.style || 'Balanced'}.`,
             totalCost: found.totalCost || Number(found.budget) || 1200,
             days: Array.from({ length: daysCount }, (_, i) => ({
               day: i + 1,
               date: `Day ${i + 1}`,
               morning: {
-                activity: found.itinerary?.[i]?.activities?.[0]?.replace('Morning: ', '') || 'Historical monument walking exploration.',
-                location: found.destination?.split(',')[0] + ' center',
-                duration: '3 hours',
-                cost: 20,
-                tip: 'Wear sunscreen and comfortable shoes.'
+                activity: found.itinerary?.[i]?.activities?.[0]?.replace('Morning: ', '') || 'Registan Square & Sher-Dor Madrasah',
+                category: 'attraction',
+                location: `${found.destination?.split(',')[0] || 'Samarkand'} Center`,
+                duration: '2.5 hours',
+                cost: 8,
+                tip: 'Wear comfortable shoes and sun protection.',
+                isVerified: true,
+                rating: 4.9,
+                reviewsCount: 1200,
+                lat: 39.6548,
+                lng: 66.9757
+              },
+              lunch: {
+                restaurant: 'Bibikhanum Chaykhana',
+                cuisine: 'Traditional Samarkand Plov',
+                cost: 10,
+                address: 'Tashkent St',
+                rating: 4.8,
+                isVerified: true,
+                category: 'food'
               },
               afternoon: {
-                activity: found.itinerary?.[i]?.activities?.[1]?.replace('Afternoon: ', '') || 'Gastronomic tasting and market walk.',
-                location: found.destination?.split(',')[0] + ' bazaar',
+                activity: found.itinerary?.[i]?.activities?.[1]?.replace('Afternoon: ', '') || 'Siab Folk Bazaar Walk',
+                category: 'shopping',
+                location: 'Bazaar Gate',
                 duration: '2.5 hours',
-                cost: 15,
-                tip: 'Taxis accept cash primarily.'
+                cost: 5,
+                tip: 'Sample dried fruits and sweet halva freely.',
+                isVerified: true,
+                rating: 4.7,
+                reviewsCount: 650,
+                lat: 39.6592,
+                lng: 66.9805
               },
               evening: {
                 restaurant: found.itinerary?.[i]?.activities?.[2]?.replace('Evening: Dinner at ', '')?.split(' (')[0] || 'Grand Oasis Chaykhana',
-                cuisine: 'Traditional Grill',
-                cost: 30,
-                address: found.destination?.split(',')[0] + ' Main Square'
+                cuisine: 'Traditional Shashlik & Salad',
+                cost: 25,
+                address: 'Historic Quarter',
+                rating: 4.8,
+                isVerified: true,
+                category: 'food'
               },
               hotel: {
-                name: found.itinerary?.[i]?.activities?.[3]?.replace('Hotel: ', '')?.split(' (')[0] || 'Silk Road Plaza Hotel',
+                name: found.itinerary?.[i]?.activities?.[3]?.replace('Hotel: ', '')?.split(' (')[0] || 'Silk Road Heritage Boutique Hotel',
                 stars: 4,
-                price: 80,
-                area: 'Downtown Center'
+                price: 85,
+                area: 'Historic Old City',
+                rating: 4.9
               },
-              dailyCost: 145
+              dailyCost: 133
             })),
-            packingTips: [
-              'Bring standard universal power adapter plug types C & F.',
-              'Keep local cash (Uzbekistan Som) for small souvenir shopping.',
-              'Respect dress code customs inside historical mausoleums.'
-            ],
-            visaInfo: 'A 30-day visa waiver applies to travelers from over 85 countries. Check specific passport visa conditions.',
-            bestTime: 'Spring (April-May) and Autumn (September-November) feature ideal coordinates of 22°C.',
-            emergencyNumbers: {
-              police: '102',
-              ambulance: '103',
-              embassy: '+998 (71) 120-3000'
-            }
+            packingTips: ['Universal adapter plug', 'Local cash for bazaars', 'Scarf for holy places']
           };
         }
         setTrip(found);
+        setEditableTitle(found.rawTripData.title || found.destination);
       }
     }
   }, [tripId]);
 
-  // Load Google Maps API script or fallback
-  useEffect(() => {
-    if (!trip) return;
-    
-    const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-    if (!key) {
-      setIsMapLoaded(false);
-      return;
-    }
-
-    const scriptId = 'google-maps-script-loader';
-    let script = document.getElementById(scriptId) as HTMLScriptElement | null;
-
-    const initMap = () => {
-      if (!mapRef.current || !window.google) return;
-
-      const activeDay = trip.rawTripData.days[activeDayIdx];
-      // Simulated coordinates for routing depending on the city name
-      const coords = getCityCoordinates(trip.destination);
-      
-      const map = new google.maps.Map(mapRef.current, {
-        center: coords,
-        zoom: 13,
-        styles: [
-          { elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
-          { elementType: 'labels.text.stroke', stylers: [{ color: '#1e293b' }] },
-          { elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
-          { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#334155' }] },
-          { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
-          { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#334155' }] },
-          { featureType: 'poi', stylers: [{ visibility: 'off' }] }
-        ]
-      });
-
-      // Markers for Morning, Afternoon, Evening, and Hotel
-      const locations = [
-        { label: 'M', title: activeDay.morning.activity, desc: activeDay.morning.location, offset: { x: 0.005, y: 0.005 } },
-        { label: 'A', title: activeDay.afternoon.activity, desc: activeDay.afternoon.location, offset: { x: -0.005, y: -0.005 } },
-        { label: 'E', title: `Dinner: ${activeDay.evening.restaurant}`, desc: activeDay.evening.address, offset: { x: 0.007, y: -0.002 } },
-        { label: 'H', title: `Hotel: ${activeDay.hotel.name}`, desc: activeDay.hotel.area, offset: { x: -0.002, y: 0.006 } }
-      ];
-
-      const pathCoords: { lat: number; lng: number }[] = [];
-
-      locations.forEach((loc) => {
-        const pinLatLng = { 
-          lat: coords.lat + loc.offset.x, 
-          lng: coords.lng + loc.offset.y 
-        };
-        pathCoords.push(pinLatLng);
-
-        const marker = new google.maps.Marker({
-          position: pinLatLng,
-          map,
-          label: {
-            text: loc.label,
-            color: '#ffffff',
-            fontWeight: '900'
-          },
-          title: loc.title,
-          animation: google.maps.Animation.DROP
-        });
-
-        const infoWindow = new google.maps.InfoWindow({
-          content: `<div style="color: #0f172a; padding: 6px; font-family: sans-serif;">
-            <strong style="display:block;margin-bottom:2px;">${loc.title}</strong>
-            <span style="font-size:0.75rem;color:#475569;">📍 ${loc.desc}</span>
-          </div>`
-        });
-
-        marker.addListener('click', () => {
-          infoWindow.open(map, marker);
-        });
-      });
-
-      // Draw polyline route connecting day events
-      new google.maps.Polyline({
-        path: pathCoords,
-        geodesic: true,
-        strokeColor: '#0ea5e9',
-        strokeOpacity: 0.8,
-        strokeWeight: 3,
-        map
-      });
-
-      setIsMapLoaded(true);
-    };
-
-    if (window.google && window.google.maps) {
-      initMap();
-    } else if (!script) {
-      script = document.createElement('script');
-      script.id = scriptId;
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${key}`;
-      script.async = true;
-      script.onload = () => {
-        initMap();
-      };
-      document.head.appendChild(script);
-    } else {
-      script.addEventListener('load', initMap);
-    }
-
-    return () => {
-      if (script) {
-        script.removeEventListener('load', initMap);
-      }
-    };
-  }, [trip, activeDayIdx]);
-
-  // Helper coordinate mapper
-  const getCityCoordinates = (destName: string) => {
-    const lower = destName.toLowerCase();
-    if (lower.includes('samarkand')) return { lat: 39.6542, lng: 66.9597 };
-    if (lower.includes('bukhara')) return { lat: 39.7747, lng: 64.4286 };
-    if (lower.includes('khiva')) return { lat: 41.3783, lng: 60.3639 };
-    if (lower.includes('paris')) return { lat: 48.8566, lng: 2.3522 };
-    if (lower.includes('tokyo')) return { lat: 35.6762, lng: 139.6503 };
-    if (lower.includes('dubai')) return { lat: 25.2048, lng: 55.2708 };
-    return { lat: 41.2995, lng: 69.2401 }; // Tashkent default
-  };
-
   if (!trip) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '80vh', color: 'var(--color-text-muted)' }}>
-        <LoaderComponent />
+      <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+        <p>Loading Trip Workspace...</p>
+        <button onClick={onBack} className="btn-secondary" style={{ marginTop: '12px', padding: '8px 16px' }}>
+          Back to My Trips
+        </button>
       </div>
     );
   }
 
-  // Calculate Itinerary Cost metrics
-  const activeDay = trip.rawTripData.days[activeDayIdx];
-  const totalSpent = trip.rawTripData.days.reduce((acc: number, d: any) => {
-    return acc + (Number(d.morning.cost) || 0) + (Number(d.afternoon.cost) || 0) + (Number(d.evening.cost) || 0) + (Number(d.hotel.price) || 0);
-  }, 0);
-  const budgetLimit = Number(trip.budget) || trip.rawTripData.totalCost || 2000;
-  const remaining = budgetLimit - totalSpent;
-  const progressPercent = Math.min((totalSpent / budgetLimit) * 100, 100);
+  const activeDay = trip.rawTripData.days[activeDayIdx] || trip.rawTripData.days[0];
 
-  // Day Regeneration simulated via API/mock
-  const handleRegenerateDay = async () => {
-    if (confirm(t('common.confirm') + '?')) {
-      alert('AI Copilot is rewriting details for Day ' + activeDay.day + '...');
-      // Simulated new activities
-      const updated = { ...trip };
-      updated.rawTripData.days[activeDayIdx] = {
-        ...activeDay,
-        morning: {
-          activity: 'Premium morning museum archive gallery visit',
-          location: 'City Gallery Hall',
-          duration: '3 hours',
-          cost: 15,
-          tip: 'No photography allowed inside.'
-        },
-        afternoon: {
-          activity: 'Local handcraft workshop experience',
-          location: 'Master artisan district',
-          duration: '2 hours',
-          cost: 25,
-          tip: 'Perfect place to buy authentic gifts.'
-        }
-      };
-      setTrip(updated);
-      saveTripToDatabase(updated);
+  // Helper to extract category icon
+  const getCategoryIcon = (category?: string) => {
+    switch (category) {
+      case 'attraction': return <Landmark size={15} style={{ color: '#2563eb' }} />;
+      case 'food': return <Utensils size={15} style={{ color: '#f59e0b' }} />;
+      case 'cafe': return <Coffee size={15} style={{ color: '#d97706' }} />;
+      case 'transport': return <Car size={15} style={{ color: '#06b6d4' }} />;
+      case 'shopping': return <ShoppingBag size={15} style={{ color: '#ec4899' }} />;
+      case 'entertainment': return <Music size={15} style={{ color: '#8b5cf6' }} />;
+      case 'lodging': return <Hotel size={15} style={{ color: '#10b981' }} />;
+      default: return <Compass size={15} style={{ color: '#2563eb' }} />;
     }
   };
 
-  // Node editing actions
-  const handleOpenEdit = (section: 'morning' | 'afternoon' | 'evening' | 'hotel') => {
-    setEditingNode({
-      dayIdx: activeDayIdx,
-      section,
-      data: { ...activeDay[section] }
-    });
-    setIsEditModalOpen(true);
-  };
-
-  const handleSaveEdit = () => {
-    if (!editingNode) return;
-    const { section, data } = editingNode;
-    const updated = { ...trip };
-    updated.rawTripData.days[activeDayIdx][section] = data;
-    
-    // Update legacy text descriptions as well to synchronize with MyTrips card previews
-    const activities = [
-      `Morning: ${updated.rawTripData.days[activeDayIdx].morning.activity}`,
-      `Afternoon: ${updated.rawTripData.days[activeDayIdx].afternoon.activity}`,
-      `Evening: Dinner at ${updated.rawTripData.days[activeDayIdx].evening.restaurant || updated.rawTripData.days[activeDayIdx].evening.activity}`,
-      `Hotel: ${updated.rawTripData.days[activeDayIdx].hotel.name}`
-    ];
-    if (updated.itinerary?.[activeDayIdx]) {
-      updated.itinerary[activeDayIdx].activities = activities;
+  // Convert current day schedule items into MapPoints for TripMap
+  const mapPoints: MapPoint[] = [
+    {
+      id: 'morning-node',
+      title: activeDay.morning.activity,
+      category: activeDay.morning.category || 'attraction',
+      lat: activeDay.morning.lat || 39.6548,
+      lng: activeDay.morning.lng || 66.9757,
+      timeSlot: 'Morning (09:00 - 12:30)',
+      cost: activeDay.morning.cost,
+      address: activeDay.morning.location,
+      isVerified: activeDay.morning.isVerified ?? true
+    },
+    {
+      id: 'lunch-node',
+      title: activeDay.lunch ? `Lunch: ${activeDay.lunch.restaurant}` : 'Local Lunch Break',
+      category: 'food',
+      lat: (activeDay.morning.lat || 39.6548) + 0.003,
+      lng: (activeDay.morning.lng || 66.9757) + 0.002,
+      timeSlot: 'Lunch (12:30 - 14:00)',
+      cost: activeDay.lunch?.cost || 10,
+      address: activeDay.lunch?.address || 'City Center',
+      isVerified: true
+    },
+    {
+      id: 'afternoon-node',
+      title: activeDay.afternoon.activity,
+      category: activeDay.afternoon.category || 'shopping',
+      lat: activeDay.afternoon.lat || 39.6592,
+      lng: activeDay.afternoon.lng || 66.9805,
+      timeSlot: 'Afternoon (14:00 - 17:30)',
+      cost: activeDay.afternoon.cost,
+      address: activeDay.afternoon.location,
+      isVerified: activeDay.afternoon.isVerified ?? true
+    },
+    {
+      id: 'evening-node',
+      title: `Dinner: ${activeDay.evening.restaurant}`,
+      category: 'food',
+      lat: (activeDay.afternoon.lat || 39.6592) - 0.002,
+      lng: (activeDay.afternoon.lng || 66.9805) + 0.004,
+      timeSlot: 'Evening (18:00 - 21:00)',
+      cost: activeDay.evening.cost,
+      address: activeDay.evening.address,
+      isVerified: true
     }
+  ];
 
-    setTrip(updated);
-    saveTripToDatabase(updated);
-    setIsEditModalOpen(false);
-    setEditingNode(null);
-  };
-
-  // Add Custom activity actions
-  const handleAddActivity = () => {
-    const updated = { ...trip };
-    const targetSection = customActivity.section as 'morning' | 'afternoon';
-    
-    updated.rawTripData.days[activeDayIdx][targetSection] = {
-      activity: customActivity.activity || 'Custom Walk',
-      location: customActivity.location || 'Local street area',
-      duration: customActivity.duration,
-      cost: Number(customActivity.cost) || 0,
-      tip: customActivity.tip || 'No special requirements.'
-    };
-
-    setTrip(updated);
-    saveTripToDatabase(updated);
-    setIsAddModalOpen(false);
-    setCustomActivity({
-      section: 'morning',
-      activity: '',
-      location: '',
-      duration: '2 hours',
-      cost: 0,
-      tip: ''
-    });
-  };
-
-  // Delete node details
-  const handleDeleteNode = (section: 'morning' | 'afternoon') => {
-    if (confirm('Delete activity?')) {
-      const updated = { ...trip };
-      updated.rawTripData.days[activeDayIdx][section] = {
-        activity: 'Rest block / Open schedule slot',
-        location: 'Hotel vicinity',
-        duration: 'N/A',
-        cost: 0,
-        tip: 'Relax or explore nearby spots at your leisure.'
-      };
-      setTrip(updated);
-      saveTripToDatabase(updated);
-    }
-  };
-
-  // Write updated trip record to LocalStorage and trigger Supabase proxy if configured
-  const saveTripToDatabase = async (updatedTrip: any) => {
-    // 1. Sync local
-    const saved = localStorage.getItem('travel_uz_ai_trips');
-    if (saved) {
-      const list = JSON.parse(saved);
-      const filtered = list.filter((t: any) => String(t.id) !== String(updatedTrip.id));
-      filtered.unshift(updatedTrip);
-      localStorage.setItem('travel_uz_ai_trips', JSON.stringify(filtered));
-    }
-
-    // 2. Sync FastAPI backend
-    try {
-      if (updatedTrip.id && !String(updatedTrip.id).startsWith('t-') && !String(updatedTrip.id).startsWith('ai-')) {
-        await api.put(`/trips/${updatedTrip.id}`, {
-          title: updatedTrip.destination,
-          content_json: updatedTrip.rawTripData
-        });
+  // Save changes to localStorage
+  const persistTrip = (updatedTrip: any) => {
+    setTrip(updatedTrip);
+    const localTripsSaved = localStorage.getItem('travel_uz_ai_trips');
+    if (localTripsSaved) {
+      const parsed = JSON.parse(localTripsSaved);
+      const idx = parsed.findIndex((t: any) => String(t.id) === String(trip.id));
+      if (idx !== -1) {
+        parsed[idx] = updatedTrip;
+        localStorage.setItem('travel_uz_ai_trips', JSON.stringify(parsed));
       }
-    } catch (err) {
-      console.warn('Backend database sync error:', err);
     }
   };
 
-  // Clone trip draft
-  const handleCloneTrip = () => {
-    const cloned = {
+  // Title Save
+  const handleSaveTitle = () => {
+    setIsEditingTitle(false);
+    if (!editableTitle.trim()) return;
+    const updated = {
       ...trip,
-      id: 'clone-' + Date.now(),
-      destination: `${trip.destination} (Copy)`
+      rawTripData: {
+        ...trip.rawTripData,
+        title: editableTitle
+      }
     };
-    const saved = localStorage.getItem('travel_uz_ai_trips');
-    const list = saved ? JSON.parse(saved) : [];
-    list.unshift(cloned);
-    localStorage.setItem('travel_uz_ai_trips', JSON.stringify(list));
-    alert('Itinerary cloned successfully as a new copy.');
+    persistTrip(updated);
   };
 
-  // Export printable Itinerary window
-  const handleExportPrint = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-    
-    const styleBlock = `
-      body { font-family: 'Plus Jakarta Sans', sans-serif; background: #ffffff; color: #0f172a; padding: 40px; }
-      h1 { font-size: 2.2rem; color: #1e3a8a; margin-bottom: 6px; }
-      .meta { font-size: 0.9rem; color: #64748b; margin-bottom: 24px; padding-bottom: 12px; border-bottom: 2px solid #e2e8f0; }
-      .day-card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 20px; page-break-inside: avoid; }
-      .day-title { font-size: 1.3rem; font-weight: 800; color: #0369a1; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; margin-bottom: 12px; }
-      .activity { margin-bottom: 14px; }
-      .act-time { font-size: 0.75rem; font-weight: bold; color: #0ea5e9; text-transform: uppercase; }
-      .act-title { font-size: 1rem; font-weight: 700; margin: 2px 0; }
-      .act-desc { font-size: 0.85rem; color: #475569; }
-      .price { color: #10b981; font-weight: bold; }
-    `;
+  // Add Day
+  const handleAddDay = () => {
+    const newDayNum = trip.rawTripData.days.length + 1;
+    const newDay = {
+      day: newDayNum,
+      date: `Day ${newDayNum}`,
+      morning: {
+        activity: 'Morning Sightseeing & Cultural Discovery',
+        category: 'attraction',
+        location: `${trip.destination?.split(',')[0]} Historic Quarter`,
+        duration: '2.5 hours',
+        cost: 10,
+        tip: 'Check morning ticket queues early.',
+        isVerified: true,
+        rating: 4.8
+      },
+      lunch: {
+        restaurant: 'Local Artisan Cafe',
+        cuisine: 'Regional Specialty & Tea',
+        cost: 12,
+        address: 'Bazaar Promenade',
+        isVerified: true
+      },
+      afternoon: {
+        activity: 'Afternoon Craft Quarter & Panoramic Viewpoint',
+        category: 'shopping',
+        location: 'Old Town Promenade',
+        duration: '2 hours',
+        cost: 5,
+        tip: 'Great photo vantage point during afternoon light.',
+        isVerified: true
+      },
+      evening: {
+        restaurant: 'Courtyard Grill & Teahouse',
+        cuisine: 'Traditional Grill & Bread',
+        cost: 20,
+        address: 'Old City Center',
+        isVerified: true
+      },
+      hotel: activeDay.hotel,
+      dailyCost: 120
+    };
 
-    const bodyHtml = `
-      <h1>${trip.rawTripData.title}</h1>
-      <div class="meta">
-        Style: ${trip.style || 'Custom'} | Budget Limit: $${budgetLimit} | Total Est Expense: $${totalSpent}
-      </div>
-      <div>
-        ${trip.rawTripData.days.map((d: any) => `
-          <div class="day-card">
-            <div class="day-title">Day ${d.day} — Itinerary</div>
-            <div class="activity">
-              <span class="act-time">Morning Plan</span>
-              <div class="act-title">${d.morning.activity}</div>
-              <div class="act-desc">📍 Location: ${d.morning.location} • Cost: <span class="price">$${d.morning.cost}</span></div>
-            </div>
-            <div class="activity">
-              <span class="act-time">Afternoon Highlight</span>
-              <div class="act-title">${d.afternoon.activity}</div>
-              <div class="act-desc">📍 Location: ${d.afternoon.location} • Cost: <span class="price">$${d.afternoon.cost}</span></div>
-            </div>
-            <div class="activity">
-              <span class="act-time">Dinner</span>
-              <div class="act-title">Dining at ${d.evening.restaurant} (${d.evening.cuisine} Cuisine)</div>
-              <div class="act-desc">📍 Address: ${d.evening.address} • Cost: <span class="price">$${d.evening.cost}</span></div>
-            </div>
-            <div class="activity">
-              <span class="act-time">Accommodation</span>
-              <div class="act-title">${d.hotel.name} (${d.hotel.stars}★)</div>
-              <div class="act-desc">📍 Area: ${d.hotel.area} • Night Rate: <span class="price">$${d.hotel.price}</span></div>
-            </div>
-          </div>
-        `).join('')}
-      </div>
-    `;
-
-    printWindow.document.write(`<html><head><title>Itinerary Print</title><style>${styleBlock}</style></head><body>${bodyHtml}</body></html>`);
-    printWindow.document.close();
-    printWindow.print();
+    const updated = {
+      ...trip,
+      rawTripData: {
+        ...trip.rawTripData,
+        days: [...trip.rawTripData.days, newDay]
+      }
+    };
+    persistTrip(updated);
+    setActiveDayIdx(newDayNum - 1);
   };
 
-  const handleExportJson = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(trip.rawTripData, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `${trip.destination.replace(/[\s,]+/g, '_')}_itinerary.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-  };
-
-  const handleDownloadBackendPdf = () => {
+  // PDF Export
+  const handleDownloadPdf = () => {
     const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
-    const pdfUrl = `${baseUrl}/trips/${tripId}/pdf`;
-    window.open(pdfUrl, '_blank');
+    window.open(`${baseUrl}/trips/${trip.id}/pdf`, '_blank');
+  };
+
+  // Share Public Link
+  const handleShareLink = () => {
+    const token = trip.share_token || 'public-trip-share';
+    const url = `${window.location.origin}/trip/${token}`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url);
+      alert(`Public share link copied to clipboard:\n${url}`);
+    } else {
+      prompt('Copy share link:', url);
+    }
+  };
+
+  // Trigger Adaptation Options
+  const handleTriggerAdaptation = (promptKey: string) => {
+    setActiveAdaptationPrompt(promptKey);
+
+    let diff = {
+      prompt: promptKey,
+      reason: 'User fatigue / high walking distance reported',
+      removing: ['14:30 – High-exertion 3km walking tour of outer quarters'],
+      adding: ['14:30 – Traditional hammam relaxation & shaded teahouse garden lounge (Chaykhana Oasis)'],
+      costImpactUSD: -5,
+      walkingSavedKm: 2.8
+    };
+
+    if (promptKey === 'raining') {
+      diff = {
+        prompt: 'It is raining',
+        reason: 'Precipitation detected in itinerary area',
+        removing: ['14:30 – Open-air boulevard park & architectural garden walk'],
+        adding: ['14:30 – Covered historical domed bazaar (Taqi Zargaron) & indoor carpet museum'],
+        costImpactUSD: 2,
+        walkingSavedKm: 1.5
+      };
+    } else if (promptKey === 'budget') {
+      diff = {
+        prompt: '$40 remaining today',
+        reason: 'Budget constraint optimization applied',
+        removing: ['19:00 – Premium multi-course rooftop banquet ($35/person)'],
+        adding: ['19:00 – Legendary family somsa & tandoor grill lokanta ($7/person) + free evening park stroll'],
+        costImpactUSD: -28,
+        walkingSavedKm: 0.2
+      };
+    } else if (promptKey === 'cluster') {
+      diff = {
+        prompt: 'Move activities closer',
+        reason: 'Transit fatigue minimization',
+        removing: ['15:30 – Outlying observatory 6km across city'],
+        adding: ['15:30 – Adjacent 15th-century madrasah courtyard within 300m walking radius'],
+        costImpactUSD: 0,
+        walkingSavedKm: 4.2
+      };
+    }
+
+    setAdaptationDiff(diff);
+    setShowAdaptationDrawer(true);
+  };
+
+  // Apply Adaptation Swap
+  const handleApplyAdaptation = () => {
+    if (!adaptationDiff) return;
+
+    const currentDays = [...trip.rawTripData.days];
+    const targetDay = { ...currentDays[activeDayIdx] };
+
+    if (adaptationDiff.prompt.includes('rain') || adaptationDiff.prompt === 'raining') {
+      targetDay.afternoon = {
+        ...targetDay.afternoon,
+        activity: 'Covered Historical Domed Bazaar & Carpet Museum',
+        category: 'shopping',
+        tip: 'Completely indoor & rain-sheltered. Free tea inside craft stalls.',
+        cost: 4
+      };
+    } else if (adaptationDiff.prompt.includes('tired')) {
+      targetDay.afternoon = {
+        ...targetDay.afternoon,
+        activity: 'Traditional Hammam & Shaded Teahouse Lounge',
+        category: 'entertainment',
+        tip: 'Resting tea ceremony with herbal infusion and sweets.',
+        cost: 15
+      };
+    } else if (adaptationDiff.prompt.includes('budget')) {
+      targetDay.evening = {
+        ...targetDay.evening,
+        restaurant: 'Family Tandoor Somsa & Plov Lokanta',
+        cost: 8,
+        cuisine: 'Fresh clay-baked somsa and spiced tea'
+      };
+    }
+
+    currentDays[activeDayIdx] = targetDay;
+    const updated = {
+      ...trip,
+      rawTripData: {
+        ...trip.rawTripData,
+        days: currentDays
+      }
+    };
+    persistTrip(updated);
+    setShowAdaptationDrawer(false);
+    setAdaptationDiff(null);
   };
 
   return (
-    <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', textAlign: 'left' }}>
       
-      {/* Header section with actions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-        <button 
-          onClick={onBack} 
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'transparent', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 700 }}
+      {/* Top Breadcrumb & Quick Actions */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        <button
+          onClick={onBack}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--color-text-secondary, #94a3b8)',
+            cursor: 'pointer',
+            fontSize: '0.85rem',
+            fontWeight: 700,
+          }}
         >
           <ArrowLeft size={16} />
-          {t('common.back')}
+          <span>Back to My Trips</span>
         </button>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={handleDownloadBackendPdf} className="btn-primary" style={{ padding: '8px 16px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => handleTriggerAdaptation('tired')}
+            style={{
+              padding: '8px 14px',
+              borderRadius: '10px',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
+              background: 'rgba(245, 158, 11, 0.1)',
+              color: '#f59e0b',
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+            }}
+          >
+            <Zap size={14} />
+            <span>"I'm Tired"</span>
+          </button>
+
+          <button
+            onClick={() => handleTriggerAdaptation('raining')}
+            style={{
+              padding: '8px 14px',
+              borderRadius: '10px',
+              border: '1px solid rgba(6, 182, 212, 0.3)',
+              background: 'rgba(6, 182, 212, 0.1)',
+              color: '#06b6d4',
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+            }}
+          >
+            <CloudRain size={14} />
+            <span>"It's Raining"</span>
+          </button>
+
+          <button
+            onClick={handleDownloadPdf}
+            className="btn-secondary"
+            style={{ padding: '8px 14px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
             <Download size={14} />
-            Download PDF
+            <span>Export PDF</span>
           </button>
-          <button onClick={handleCloneTrip} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <RefreshCw size={14} />
-            {getLocalText('Clone Draft')}
-          </button>
-          <button onClick={handleExportPrint} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <FileText size={14} />
-            Print Brochure
-          </button>
-          <button onClick={handleExportJson} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Download size={14} />
-            JSON
+
+          <button
+            onClick={handleShareLink}
+            className="btn-secondary"
+            style={{ padding: '8px 14px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <Share2 size={14} />
+            <span>Share Link</span>
           </button>
         </div>
       </div>
 
-      {/* Main Info Banner */}
-      <div className="glass-panel" style={{ padding: '24px 32px', background: 'var(--color-bg-surface)', border: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+      {/* Main Workspace Header Banner */}
+      <div
+        style={{
+          background: 'var(--color-bg-surface, #0f172a)',
+          border: '1px solid var(--glass-border, rgba(255,255,255,0.08))',
+          borderRadius: '24px',
+          padding: '24px 32px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+          boxShadow: 'var(--glass-shadow)',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
           <div>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--color-accent)', background: 'var(--color-accent-glow)', padding: '4px 10px', borderRadius: '6px' }}>
-              {trip.style || 'Adventure'} Plan
-            </span>
-            <h2 style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--color-text-primary)', marginTop: '8px', marginBottom: 0, fontFamily: 'var(--font-heading)' }}>
-              {trip.destination}
-            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+              <span
+                style={{
+                  fontSize: '0.7rem',
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  color: 'var(--color-accent, #2563eb)',
+                  background: 'rgba(37, 99, 235, 0.1)',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                }}
+              >
+                {trip.style || 'Balanced'} Strategy
+              </span>
+              <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted, #64748b)' }}>
+                📍 {trip.destination}
+              </span>
+            </div>
+
+            {/* Editable Title */}
+            {isEditingTitle ? (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  value={editableTitle}
+                  onChange={(e) => setEditableTitle(e.target.value)}
+                  style={{
+                    fontSize: '1.6rem',
+                    fontWeight: 900,
+                    color: '#ffffff',
+                    background: 'var(--color-bg, #090d1a)',
+                    border: '1px solid var(--color-accent, #2563eb)',
+                    borderRadius: '8px',
+                    padding: '4px 12px',
+                  }}
+                />
+                <button
+                  onClick={handleSaveTitle}
+                  className="btn-primary"
+                  style={{ padding: '8px 14px', fontSize: '0.8rem' }}
+                >
+                  Save
+                </button>
+              </div>
+            ) : (
+              <h1
+                onClick={() => setIsEditingTitle(true)}
+                style={{
+                  margin: 0,
+                  fontSize: '1.8rem',
+                  fontWeight: 900,
+                  color: 'var(--color-text-primary, #ffffff)',
+                  fontFamily: 'var(--font-heading, sans-serif)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+                title="Click to edit trip title"
+              >
+                <span>{trip.rawTripData.title || trip.destination}</span>
+                <Edit3 size={16} style={{ opacity: 0.4 }} />
+              </h1>
+            )}
           </div>
-          <div style={{ display: 'flex', gap: '14px', fontSize: '0.85rem', color: 'var(--color-text-muted)', background: 'var(--color-bg)', padding: '10px 16px', borderRadius: '12px', border: '1px solid var(--glass-border)', marginTop: '8px' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={14} /> {trip.startDate}</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><User size={14} /> {trip.travelers || 2} Pax</span>
+
+          {/* Telemetry Chips & Budget Health */}
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div
+              style={{
+                background: 'var(--color-bg, #090d1a)',
+                border: '1px solid var(--glass-border)',
+                borderRadius: '12px',
+                padding: '8px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '0.8rem',
+                color: 'var(--color-text-secondary)',
+              }}
+            >
+              <Calendar size={14} style={{ color: 'var(--color-accent)' }} />
+              <span>{trip.rawTripData.days?.length || 5} Days ({trip.startDate || 'Upcoming'})</span>
+            </div>
+
+            <div
+              style={{
+                background: 'var(--color-bg, #090d1a)',
+                border: '1px solid var(--glass-border)',
+                borderRadius: '12px',
+                padding: '8px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '0.8rem',
+                color: 'var(--color-text-secondary)',
+              }}
+            >
+              <User size={14} style={{ color: '#8b5cf6' }} />
+              <span>{trip.travelers || 2} Travelers</span>
+            </div>
+
+            <div
+              style={{
+                background: 'var(--color-bg, #090d1a)',
+                border: '1px solid var(--glass-border)',
+                borderRadius: '12px',
+                padding: '8px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '0.8rem',
+              }}
+            >
+              <DollarSign size={14} style={{ color: '#10b981' }} />
+              <span style={{ color: 'var(--color-text-muted)' }}>Est. Total:</span>
+              <strong style={{ color: '#10b981' }}>{formatPrice(trip.rawTripData.totalCost || 1200)}</strong>
+            </div>
           </div>
         </div>
-        <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-          {trip.rawTripData.summary}
-        </p>
-      </div>
 
-      {/* Grid: Timeline and widgets */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '24px' }} className="details-main-grid">
-        
-        {/* Left pane: Day selector & Day Timeline */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          
-          {/* Day selection pill tabs */}
-          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px', scrollbarWidth: 'none' }}>
+        {/* View Mode Switcher Pills */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--glass-border, rgba(255,255,255,0.06))', paddingTop: '16px', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '6px', background: 'var(--color-bg, #090d1a)', padding: '4px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+            {[
+              { id: 'timeline', label: '📋 Timeline (List)' },
+              { id: 'calendar', label: '📅 Calendar View' },
+              { id: 'map', label: '🗺️ Map View' }
+            ].map((m) => (
+              <button
+                key={m.id}
+                onClick={() => setViewMode(m.id as WorkspaceViewMode)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: viewMode === m.id ? 'var(--color-accent, #2563eb)' : 'transparent',
+                  color: viewMode === m.id ? '#ffffff' : 'var(--color-text-secondary)',
+                  fontSize: '0.8rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Day selection pills */}
+          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
             {trip.rawTripData.days.map((day: any, idx: number) => (
               <button
                 key={idx}
                 onClick={() => setActiveDayIdx(idx)}
                 style={{
-                  padding: '10px 18px',
+                  padding: '8px 14px',
                   borderRadius: '10px',
-                  border: '1px solid var(--glass-border)',
-                  background: activeDayIdx === idx ? 'var(--color-accent-glow)' : 'var(--color-bg-surface)',
-                  color: activeDayIdx === idx ? 'var(--color-accent)' : 'var(--color-text-muted)',
-                  fontSize: '0.85rem',
+                  border: activeDayIdx === idx ? '1px solid var(--color-accent, #2563eb)' : '1px solid var(--glass-border)',
+                  background: activeDayIdx === idx ? 'rgba(37, 99, 235, 0.15)' : 'var(--color-bg, #090d1a)',
+                  color: activeDayIdx === idx ? '#ffffff' : 'var(--color-text-muted)',
+                  fontSize: '0.8rem',
                   fontWeight: 800,
-                  whiteSpace: 'nowrap',
                   cursor: 'pointer',
-                  transition: 'all 0.2s'
+                  whiteSpace: 'nowrap',
                 }}
               >
                 Day {day.day}
               </button>
             ))}
-          </div>
 
-          {/* Current Day Schedule Timeline */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            
-            {/* Timeline header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-primary)', margin: 0 }}>
-                Day {activeDay.day} Schedule
-              </h3>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button 
-                  onClick={() => setIsAddModalOpen(true)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', fontSize: '0.75rem', color: 'var(--color-accent)', background: 'var(--color-accent-glow)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700 }}
-                >
-                  <Plus size={14} /> {getLocalText('Add Activity')}
-                </button>
-                <button 
-                  onClick={handleRegenerateDay}
-                  style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', fontSize: '0.75rem', color: 'var(--color-purple)', background: 'rgba(139,92,246,0.08)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700 }}
-                >
-                  <RefreshCw size={12} /> AI Rewrite
-                </button>
-              </div>
-            </div>
-
-            {/* Timeline nodes */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative', paddingLeft: '16px', borderLeft: '2px dashed var(--glass-border)' }}>
-              
-              {/* Event 1: Morning */}
-              <div 
-                className="glass-panel" 
-                style={{ 
-                  padding: '20px', 
-                  background: 'var(--color-bg-surface)', 
-                  border: hoveredLocation === 'morning' ? '1px solid var(--color-accent)' : '1px solid var(--glass-border)', 
-                  display: 'flex', 
-                  gap: '16px',
-                  transition: 'all 0.2s',
-                  position: 'relative'
-                }}
-                onMouseEnter={() => setHoveredLocation('morning')}
-                onMouseLeave={() => setHoveredLocation(null)}
-              >
-                <div style={{ background: 'rgba(14, 165, 233, 0.1)', color: 'var(--color-accent)', padding: '10px', borderRadius: '12px', height: 'fit-content' }}>
-                  <Compass size={20} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>
-                        {getLocalText('Morning Plan')}
-                      </span>
-                      <h4 style={{ fontSize: '1.05rem', fontWeight: 800, margin: '2px 0 6px 0', color: 'var(--color-text-primary)' }}>
-                        {activeDay.morning.activity}
-                      </h4>
-                    </div>
-                    
-                    {/* Node Actions */}
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button onClick={() => handleOpenEdit('morning')} style={{ color: 'var(--color-purple)', padding: '4px' }}><Edit3 size={14} /></button>
-                      <button onClick={() => handleDeleteNode('morning')} style={{ color: '#ef4444', padding: '4px' }}><Trash2 size={14} /></button>
-                    </div>
-                  </div>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'block' }}>
-                    📍 {getLocalText('Location')}: {activeDay.morning.location} • ⏱️ {activeDay.morning.duration} • 💰 ${activeDay.morning.cost}
-                  </span>
-                  {activeDay.morning.tip && (
-                    <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', display: 'block', marginTop: '6px', fontStyle: 'italic' }}>
-                      💡 Tip: {activeDay.morning.tip}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Event 2: Afternoon */}
-              <div 
-                className="glass-panel" 
-                style={{ 
-                  padding: '20px', 
-                  background: 'var(--color-bg-surface)', 
-                  border: hoveredLocation === 'afternoon' ? '1px solid var(--color-accent)' : '1px solid var(--glass-border)', 
-                  display: 'flex', 
-                  gap: '16px',
-                  transition: 'all 0.2s',
-                  position: 'relative'
-                }}
-                onMouseEnter={() => setHoveredLocation('afternoon')}
-                onMouseLeave={() => setHoveredLocation(null)}
-              >
-                <div style={{ background: 'rgba(139, 92, 246, 0.1)', color: 'var(--color-purple)', padding: '10px', borderRadius: '12px', height: 'fit-content' }}>
-                  <Star size={20} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>
-                        {getLocalText('Afternoon Plan')}
-                      </span>
-                      <h4 style={{ fontSize: '1.05rem', fontWeight: 800, margin: '2px 0 6px 0', color: 'var(--color-text-primary)' }}>
-                        {activeDay.afternoon.activity}
-                      </h4>
-                    </div>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button onClick={() => handleOpenEdit('afternoon')} style={{ color: 'var(--color-purple)', padding: '4px' }}><Edit3 size={14} /></button>
-                      <button onClick={() => handleDeleteNode('afternoon')} style={{ color: '#ef4444', padding: '4px' }}><Trash2 size={14} /></button>
-                    </div>
-                  </div>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'block' }}>
-                    📍 {getLocalText('Location')}: {activeDay.afternoon.location} • ⏱️ {activeDay.afternoon.duration} • 💰 ${activeDay.afternoon.cost}
-                  </span>
-                  {activeDay.afternoon.tip && (
-                    <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', display: 'block', marginTop: '6px', fontStyle: 'italic' }}>
-                      💡 Tip: {activeDay.afternoon.tip}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Event 3: Dinner (Evening) */}
-              <div 
-                className="glass-panel" 
-                style={{ 
-                  padding: '20px', 
-                  background: 'var(--color-bg-surface)', 
-                  border: hoveredLocation === 'evening' ? '1px solid var(--color-accent)' : '1px solid var(--glass-border)', 
-                  display: 'flex', 
-                  gap: '16px',
-                  transition: 'all 0.2s',
-                  position: 'relative'
-                }}
-                onMouseEnter={() => setHoveredLocation('evening')}
-                onMouseLeave={() => setHoveredLocation(null)}
-              >
-                <div style={{ background: 'rgba(245, 158, 11, 0.1)', color: 'var(--color-accent-gold)', padding: '10px', borderRadius: '12px', height: 'fit-content' }}>
-                  <MapPin size={20} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>
-                        {getLocalText('Evening Dining')}
-                      </span>
-                      <h4 style={{ fontSize: '1.05rem', fontWeight: 800, margin: '2px 0 6px 0', color: 'var(--color-text-primary)' }}>
-                        Dinner at {activeDay.evening.restaurant}
-                      </h4>
-                    </div>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button onClick={() => handleOpenEdit('evening')} style={{ color: 'var(--color-purple)', padding: '4px' }}><Edit3 size={14} /></button>
-                    </div>
-                  </div>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'block' }}>
-                    🍽️ Cuisine: {activeDay.evening.cuisine} • 📍 Address: {activeDay.evening.address} • 💰 Est Cost: ${activeDay.evening.cost}
-                  </span>
-                </div>
-              </div>
-
-              {/* Event 4: Hotel Lodging */}
-              <div 
-                className="glass-panel" 
-                style={{ 
-                  padding: '20px', 
-                  background: 'var(--color-bg-surface)', 
-                  border: hoveredLocation === 'hotel' ? '1px solid var(--color-accent)' : '1px solid var(--glass-border)', 
-                  display: 'flex', 
-                  gap: '16px',
-                  transition: 'all 0.2s',
-                  position: 'relative'
-                }}
-                onMouseEnter={() => setHoveredLocation('hotel')}
-                onMouseLeave={() => setHoveredLocation(null)}
-              >
-                <div style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: '10px', borderRadius: '12px', height: 'fit-content' }}>
-                  <CheckCircle2 size={20} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>
-                        {getLocalText('Lodging Stay')}
-                      </span>
-                      <h4 style={{ fontSize: '1.05rem', fontWeight: 800, margin: '2px 0 6px 0', color: 'var(--color-text-primary)' }}>
-                        {activeDay.hotel.name}
-                      </h4>
-                    </div>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button onClick={() => handleOpenEdit('hotel')} style={{ color: 'var(--color-purple)', padding: '4px' }}><Edit3 size={14} /></button>
-                    </div>
-                  </div>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'block' }}>
-                    📍 Area: {activeDay.hotel.area} • 🏨 Stars: {activeDay.hotel.stars}★ • 💰 Night Rate: ${activeDay.hotel.price}
-                  </span>
-                </div>
-              </div>
-
-            </div>
+            <button
+              onClick={handleAddDay}
+              style={{
+                padding: '8px 14px',
+                borderRadius: '10px',
+                border: '1px dashed var(--glass-border)',
+                background: 'transparent',
+                color: 'var(--color-accent)',
+                fontSize: '0.8rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Plus size={14} /> Add Day
+            </button>
           </div>
         </div>
-
-        {/* Right pane: Map, Weather & Budget charts */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          
-          {/* Map widget */}
-          <div className="glass-panel" style={{ height: '320px', background: 'var(--color-bg-surface)', border: '1px solid var(--glass-border)', overflow: 'hidden', position: 'relative' }}>
-            <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
-            {!isMapLoaded && (
-              /* Simulated vector mapping background fallback if API key not present */
-              <div style={{ position: 'absolute', inset: 0, background: 'var(--color-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(var(--glass-border) 1px, transparent 1px)', backgroundSize: '20px 20px', opacity: 0.7 }} />
-                
-                {/* SVG Route Visualization */}
-                <svg width="100%" height="100%" viewBox="0 0 100 100" style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
-                  {/* polyline paths connecting nodes */}
-                  <motion.path 
-                    d="M 20 80 Q 40 40 50 30 T 80 50" 
-                    fill="none" 
-                    stroke="var(--color-accent)" 
-                    strokeWidth="1.5"
-                    strokeDasharray="4,4"
-                    initial={{ pathLength: 0 }}
-                    animate={{ pathLength: 1 }}
-                    transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-                  />
-                  
-                  {/* Node Pins */}
-                  <circle cx="20" cy="80" r="3" fill={hoveredLocation === 'morning' ? 'var(--color-accent)' : '#94a3b8'} style={{ transition: 'all 0.2s' }} />
-                  <circle cx="40" cy="45" r="3" fill={hoveredLocation === 'afternoon' ? 'var(--color-purple)' : '#94a3b8'} style={{ transition: 'all 0.2s' }} />
-                  <circle cx="50" cy="30" r="3" fill={hoveredLocation === 'evening' ? '#f59e0b' : '#94a3b8'} style={{ transition: 'all 0.2s' }} />
-                  <circle cx="80" cy="50" r="3" fill={hoveredLocation === 'hotel' ? '#10b981' : '#94a3b8'} style={{ transition: 'all 0.2s' }} />
-                </svg>
-
-                <div style={{ zIndex: 5, textAlign: 'center', pointerEvents: 'none' }}>
-                  <MapPin size={24} style={{ color: 'var(--color-accent)', margin: '0 auto 6px auto' }} />
-                  <strong style={{ display: 'block', fontSize: '0.85rem' }}>Interactive Route Telemetry</strong>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Simulating routing coordinates for {trip.destination.split(',')[0]}</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Budget ring stats */}
-          <div className="glass-panel" style={{ padding: '24px', background: 'var(--color-bg-surface)', border: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--color-text-primary)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Budget Overview
-            </h4>
-
-            <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-              {/* SVG donut chart */}
-              <div style={{ position: 'relative', width: '90px', height: '90px' }}>
-                <svg width="100%" height="100%" viewBox="0 0 36 36">
-                  {/* Background Circle */}
-                  <circle cx="18" cy="18" r="15.91" fill="none" stroke="var(--glass-border)" strokeWidth="3" />
-                  {/* Progress Circle */}
-                  <circle 
-                    cx="18" 
-                    cy="18" 
-                    r="15.91" 
-                    fill="none" 
-                    stroke="var(--color-accent)" 
-                    strokeWidth="3" 
-                    strokeDasharray={`${progressPercent} ${100 - progressPercent}`}
-                    strokeDashoffset="25"
-                  />
-                </svg>
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 800 }}>
-                  <span>{Math.round(progressPercent)}%</span>
-                  <span style={{ fontSize: '0.55rem', color: 'var(--color-text-muted)' }}>Spent</span>
-                </div>
-              </div>
-
-              {/* Data list */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.8rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--color-text-muted)' }}>{getLocalText('Budget Limit')}:</span>
-                  <strong style={{ color: 'var(--color-text-primary)' }}>${budgetLimit}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--color-text-muted)' }}>{getLocalText('Total Expenses')}:</span>
-                  <strong style={{ color: '#10b981' }}>${totalSpent}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--color-text-muted)' }}>{getLocalText('Remaining')}:</span>
-                  <strong style={{ color: remaining < 0 ? '#ef4444' : 'var(--color-accent)' }}>${remaining}</strong>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Daily Weather widget */}
-          <div className="glass-panel" style={{ padding: '24px', background: 'var(--color-bg-surface)', border: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--color-text-primary)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              {getLocalText('Daily Weather Forecast')}
-            </h4>
-
-            {/* Weather highlights */}
-            <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-text-primary)' }}>
-                <Thermometer size={28} style={{ color: '#f59e0b' }} />
-                <span>24°C</span>
-              </div>
-              <div style={{ flex: 1, fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><CloudRain size={12} /> {getLocalText('Rain Probability')}: 15%</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Wind size={12} /> {getLocalText('Wind Speed')}: 12 km/h</span>
-              </div>
-            </div>
-
-            {/* Warning alert warning block */}
-            <div style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', padding: '10px 14px', borderRadius: '10px', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-              <AlertTriangle size={16} style={{ color: '#f59e0b', marginTop: '2px', flexShrink: 0 }} />
-              <span style={{ fontSize: '0.75rem', color: '#d97706', lineHeight: 1.4 }}>
-                {getLocalText('Severe Alert')}
-              </span>
-            </div>
-          </div>
-
-          {/* Flight preview info */}
-          <div className="glass-panel" style={{ padding: '24px', background: 'var(--color-bg-surface)', border: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--color-text-primary)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Domestic Flight Routing
-            </h4>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
-              <div>
-                <strong style={{ display: 'block', color: 'var(--color-text-primary)' }}>Uzbekistan Airways (HY-102)</strong>
-                <span style={{ color: 'var(--color-text-muted)' }}>TAS ➡️ SKD • Gate 4B</span>
-              </div>
-              <strong style={{ color: '#10b981', fontSize: '0.95rem' }}>$45</strong>
-            </div>
-          </div>
-
-        </div>
-
       </div>
 
-      {/* Edit Activity Modal overlay */}
-      {isEditModalOpen && editingNode && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="glass-panel" 
-            style={{ width: '100%', maxWidth: '460px', background: 'var(--color-bg-surface)', border: '1px solid var(--glass-border)', padding: '28px', display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'left' }}
-          >
+      {/* ==================== WORKSPACE MODE 1: TIMELINE (LIST) ==================== */}
+      {viewMode === 'timeline' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px' }} className="workspace-split-grid">
+          
+          {/* Left Column: Sequential Day Schedule */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--color-text-primary)', margin: 0 }}>
-                {getLocalText('Edit activity details')}
-              </h3>
-              <button onClick={() => setIsEditModalOpen(false)} style={{ color: 'var(--color-text-muted)', border: 'none', background: 'transparent', cursor: 'pointer' }}>
-                <X size={18} />
+              <div>
+                <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#ffffff' }}>
+                  Day {activeDay.day} Schedule
+                </h2>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                  Estimated daily spend: <strong style={{ color: '#10b981' }}>{formatPrice(activeDay.dailyCost || 135)}</strong>
+                </span>
+              </div>
+
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(37, 99, 235, 0.3)',
+                  background: 'rgba(37, 99, 235, 0.1)',
+                  color: 'var(--color-accent, #2563eb)',
+                  fontSize: '0.75rem',
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  cursor: 'pointer',
+                }}
+              >
+                <Plus size={14} />
+                <span>Add Stop</span>
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              
-              {/* Activity / Title field */}
-              {editingNode.section !== 'evening' && editingNode.section !== 'hotel' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>{getLocalText('Activity Name')}</label>
-                  <input 
-                    type="text" 
-                    value={editingNode.data.activity} 
-                    onChange={(e) => setEditingNode({ ...editingNode, data: { ...editingNode.data, activity: e.target.value } })}
-                    style={{ padding: '10px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--color-text-primary)' }}
-                  />
+            {/* 1. MORNING BLOCK */}
+            <div
+              onClick={() => setSelectedPlaceForModal(activeDay.morning)}
+              style={{
+                background: 'var(--color-bg-surface, #0f172a)',
+                border: '1px solid var(--glass-border, rgba(255,255,255,0.08))',
+                borderRadius: '16px',
+                padding: '18px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                cursor: 'pointer',
+                transition: 'border-color 0.2s',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span
+                    style={{
+                      background: 'rgba(37, 99, 235, 0.15)',
+                      color: 'var(--color-accent, #2563eb)',
+                      fontSize: '0.7rem',
+                      fontWeight: 800,
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                    }}
+                  >
+                    🌅 09:00 - 12:30 • MORNING
+                  </span>
+                  {activeDay.morning.isVerified && (
+                    <span style={{ fontSize: '0.65rem', color: '#10b981', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <Shield size={10} /> Verified POI
+                    </span>
+                  )}
+                </div>
+                <strong style={{ fontSize: '0.85rem', color: '#10b981' }}>
+                  {activeDay.morning.cost === 0 ? 'Free' : formatPrice(activeDay.morning.cost || 8)}
+                </strong>
+              </div>
+
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {getCategoryIcon(activeDay.morning.category)}
+                  <span>{activeDay.morning.activity}</span>
+                </h3>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                  <MapPin size={12} style={{ color: 'var(--color-accent)' }} />
+                  {activeDay.morning.location} • Dwell: {activeDay.morning.duration || '2.5 hrs'}
+                </span>
+              </div>
+
+              {activeDay.morning.tip && (
+                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', background: 'rgba(255,255,255,0.02)', padding: '8px 10px', borderRadius: '8px' }}>
+                  💡 {activeDay.morning.tip}
                 </div>
               )}
-
-              {/* Specific fields for Evening restaurant */}
-              {editingNode.section === 'evening' && (
-                <>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Restaurant Name</label>
-                    <input 
-                      type="text" 
-                      value={editingNode.data.restaurant} 
-                      onChange={(e) => setEditingNode({ ...editingNode, data: { ...editingNode.data, restaurant: e.target.value } })}
-                      style={{ padding: '10px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--color-text-primary)' }}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Cuisine Type</label>
-                    <input 
-                      type="text" 
-                      value={editingNode.data.cuisine} 
-                      onChange={(e) => setEditingNode({ ...editingNode, data: { ...editingNode.data, cuisine: e.target.value } })}
-                      style={{ padding: '10px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--color-text-primary)' }}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Address</label>
-                    <input 
-                      type="text" 
-                      value={editingNode.data.address} 
-                      onChange={(e) => setEditingNode({ ...editingNode, data: { ...editingNode.data, address: e.target.value } })}
-                      style={{ padding: '10px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--color-text-primary)' }}
-                    />
-                  </div>
-                </>
-              )}
-
-              {/* Specific fields for Hotel stay */}
-              {editingNode.section === 'hotel' && (
-                <>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Hotel Name</label>
-                    <input 
-                      type="text" 
-                      value={editingNode.data.name} 
-                      onChange={(e) => setEditingNode({ ...editingNode, data: { ...editingNode.data, name: e.target.value } })}
-                      style={{ padding: '10px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--color-text-primary)' }}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Area Neighborhood</label>
-                    <input 
-                      type="text" 
-                      value={editingNode.data.area} 
-                      onChange={(e) => setEditingNode({ ...editingNode, data: { ...editingNode.data, area: e.target.value } })}
-                      style={{ padding: '10px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--color-text-primary)' }}
-                    />
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Night Rate ($)</label>
-                      <input 
-                        type="number" 
-                        value={editingNode.data.price} 
-                        onChange={(e) => setEditingNode({ ...editingNode, data: { ...editingNode.data, price: Number(e.target.value) } })}
-                        style={{ padding: '10px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--color-text-primary)' }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Stars rating</label>
-                      <input 
-                        type="number" 
-                        min={1} 
-                        max={5} 
-                        value={editingNode.data.stars} 
-                        onChange={(e) => setEditingNode({ ...editingNode, data: { ...editingNode.data, stars: Number(e.target.value) } })}
-                        style={{ padding: '10px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--color-text-primary)' }}
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* Standard location, duration, cost and tip fields */}
-              {editingNode.section !== 'hotel' && (
-                <>
-                  {editingNode.section !== 'evening' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>{getLocalText('Location')}</label>
-                      <input 
-                        type="text" 
-                        value={editingNode.data.location} 
-                        onChange={(e) => setEditingNode({ ...editingNode, data: { ...editingNode.data, location: e.target.value } })}
-                        style={{ padding: '10px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--color-text-primary)' }}
-                      />
-                    </div>
-                  )}
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                    {editingNode.section !== 'evening' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>{getLocalText('Duration')}</label>
-                        <input 
-                          type="text" 
-                          value={editingNode.data.duration} 
-                          onChange={(e) => setEditingNode({ ...editingNode, data: { ...editingNode.data, duration: e.target.value } })}
-                          style={{ padding: '10px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--color-text-primary)' }}
-                        />
-                      </div>
-                    )}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>{getLocalText('Cost')} ($)</label>
-                      <input 
-                        type="number" 
-                        value={editingNode.data.cost} 
-                        onChange={(e) => setEditingNode({ ...editingNode, data: { ...editingNode.data, cost: Number(e.target.value) } })}
-                        style={{ padding: '10px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--color-text-primary)' }}
-                      />
-                    </div>
-                  </div>
-
-                  {editingNode.section !== 'evening' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>{getLocalText('Notes/Tips')}</label>
-                      <textarea 
-                        value={editingNode.data.tip} 
-                        onChange={(e) => setEditingNode({ ...editingNode, data: { ...editingNode.data, tip: e.target.value } })}
-                        rows={2}
-                        style={{ padding: '10px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--color-text-primary)', resize: 'none' }}
-                      />
-                    </div>
-                  )}
-                </>
-              )}
-
             </div>
 
-            <button 
-              onClick={handleSaveEdit}
-              className="btn-premium"
-              style={{ width: '100%', padding: '12px', border: 'none', marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+            {/* TRANSIT INTERSTITIAL (Walking) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 16px', color: 'var(--color-text-muted)', fontSize: '0.72rem' }}>
+              <Navigation size={12} style={{ color: 'var(--color-accent)' }} />
+              <span>12 min walk (950m) through pedestrian park to lunch spot</span>
+            </div>
+
+            {/* 2. LUNCH BREAK */}
+            <div
+              onClick={() => setSelectedPlaceForModal(activeDay.lunch || {
+                title: 'Chaykhana Oasis',
+                category: 'food',
+                location: 'Main Bazaar',
+                cost: 10,
+                rating: 4.8
+              })}
+              style={{
+                background: 'var(--color-bg-surface, #0f172a)',
+                border: '1px solid var(--glass-border, rgba(255,255,255,0.08))',
+                borderRadius: '16px',
+                padding: '18px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                cursor: 'pointer',
+              }}
             >
-              <Check size={16} /> Save Node Changes
-            </button>
-          </motion.div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <span
+                  style={{
+                    background: 'rgba(245, 158, 11, 0.15)',
+                    color: '#f59e0b',
+                    fontSize: '0.7rem',
+                    fontWeight: 800,
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                  }}
+                >
+                  🍲 12:30 - 14:00 • LUNCH
+                </span>
+                <strong style={{ fontSize: '0.85rem', color: '#10b981' }}>
+                  {formatPrice(activeDay.lunch?.cost || 10)}
+                </strong>
+              </div>
+
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {getCategoryIcon('food')}
+                  <span>{activeDay.lunch?.restaurant || 'Traditional Silk Road Chaykhana'}</span>
+                </h3>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                  {activeDay.lunch?.cuisine || 'Authentic Samarkand Plov, Achichuk Salad & Green Tea'}
+                </span>
+              </div>
+            </div>
+
+            {/* TRANSIT INTERSTITIAL (Taxi) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 16px', color: 'var(--color-text-muted)', fontSize: '0.72rem' }}>
+              <Car size={12} style={{ color: '#06b6d4' }} />
+              <span>5 min taxi ride (~$1.50) to afternoon heritage quarter</span>
+            </div>
+
+            {/* 3. AFTERNOON BLOCK */}
+            <div
+              onClick={() => setSelectedPlaceForModal(activeDay.afternoon)}
+              style={{
+                background: 'var(--color-bg-surface, #0f172a)',
+                border: '1px solid var(--glass-border, rgba(255,255,255,0.08))',
+                borderRadius: '16px',
+                padding: '18px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                cursor: 'pointer',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span
+                    style={{
+                      background: 'rgba(236, 72, 153, 0.15)',
+                      color: '#ec4899',
+                      fontSize: '0.7rem',
+                      fontWeight: 800,
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                    }}
+                  >
+                    ☀️ 14:00 - 17:30 • AFTERNOON
+                  </span>
+                  {activeDay.afternoon.isVerified && (
+                    <span style={{ fontSize: '0.65rem', color: '#10b981', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <Shield size={10} /> Verified POI
+                    </span>
+                  )}
+                </div>
+                <strong style={{ fontSize: '0.85rem', color: '#10b981' }}>
+                  {activeDay.afternoon.cost === 0 ? 'Free Entry' : formatPrice(activeDay.afternoon.cost || 5)}
+                </strong>
+              </div>
+
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#ffffff' }}>
+                  {activeDay.afternoon.activity}
+                </h3>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                  <MapPin size={12} style={{ color: '#ec4899' }} />
+                  {activeDay.afternoon.location} • Dwell: {activeDay.afternoon.duration || '2.5 hrs'}
+                </span>
+              </div>
+
+              {activeDay.afternoon.tip && (
+                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', background: 'rgba(255,255,255,0.02)', padding: '8px 10px', borderRadius: '8px' }}>
+                  💡 {activeDay.afternoon.tip}
+                </div>
+              )}
+            </div>
+
+            {/* 4. EVENING DINING BLOCK */}
+            <div
+              onClick={() => setSelectedPlaceForModal({
+                title: activeDay.evening.restaurant,
+                category: 'food',
+                location: activeDay.evening.address,
+                cost: activeDay.evening.cost,
+                rating: 4.8
+              })}
+              style={{
+                background: 'var(--color-bg-surface, #0f172a)',
+                border: '1px solid var(--glass-border, rgba(255,255,255,0.08))',
+                borderRadius: '16px',
+                padding: '18px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                cursor: 'pointer',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <span
+                  style={{
+                    background: 'rgba(139, 92, 246, 0.15)',
+                    color: '#a855f7',
+                    fontSize: '0.7rem',
+                    fontWeight: 800,
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                  }}
+                >
+                  🌙 18:00 - 21:00 • DINNER
+                </span>
+                <strong style={{ fontSize: '0.85rem', color: '#10b981' }}>
+                  {formatPrice(activeDay.evening.cost || 25)}
+                </strong>
+              </div>
+
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#ffffff' }}>
+                  {activeDay.evening.restaurant}
+                </h3>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                  {activeDay.evening.cuisine} • {activeDay.evening.address}
+                </span>
+              </div>
+            </div>
+
+            {/* 5. HOTEL LODGING NODE */}
+            {activeDay.hotel && (
+              <div
+                style={{
+                  background: 'rgba(16, 185, 129, 0.05)',
+                  border: '1px solid rgba(16, 185, 129, 0.2)',
+                  borderRadius: '16px',
+                  padding: '16px 18px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <div>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#10b981', textTransform: 'uppercase' }}>
+                    🏨 NIGHT LODGING
+                  </span>
+                  <h4 style={{ margin: '2px 0 0 0', fontSize: '0.95rem', fontWeight: 800, color: '#ffffff' }}>
+                    {activeDay.hotel.name}
+                  </h4>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                    {activeDay.hotel.stars}★ Boutique • {activeDay.hotel.area}
+                  </span>
+                </div>
+                <strong style={{ fontSize: '0.95rem', color: '#10b981' }}>
+                  {formatPrice(activeDay.hotel.price || 85)} / night
+                </strong>
+              </div>
+            )}
+
+          </div>
+
+          {/* Right Column: Synchronized Sticky Map */}
+          <div style={{ position: 'sticky', top: '90px', height: 'calc(100vh - 130px)', minHeight: '520px' }}>
+            <TripMap
+              locations={mapPoints}
+              interactive={true}
+              height="100%"
+              onSelectLocation={(id) => {
+                const match = mapPoints.find((m) => m.id === id);
+                if (match) {
+                  setSelectedPlaceForModal({
+                    title: match.title,
+                    category: match.category,
+                    location: match.address,
+                    cost: match.cost,
+                    isVerified: match.isVerified
+                  });
+                }
+              }}
+            />
+          </div>
+
         </div>
       )}
 
-      {/* Add Custom Activity Modal Overlay */}
-      {isAddModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="glass-panel" 
-            style={{ width: '100%', maxWidth: '440px', background: 'var(--color-bg-surface)', border: '1px solid var(--glass-border)', padding: '28px', display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'left' }}
+      {/* ==================== WORKSPACE MODE 2: CALENDAR VIEW ==================== */}
+      {viewMode === 'calendar' && (
+        <div
+          style={{
+            background: 'var(--color-bg-surface, #0f172a)',
+            border: '1px solid var(--glass-border, rgba(255,255,255,0.08))',
+            borderRadius: '24px',
+            padding: '24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#ffffff' }}>
+              Day {activeDay.day} Hourly Calendar Timeline
+            </h3>
+            <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+              Standard operating slots 08:30 – 21:30
+            </span>
+          </div>
+
+          {/* Time Block Rows */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {[
+              { time: '08:30 - 09:30', title: 'Breakfast at Boutique Hotel', cat: 'food', color: '#f59e0b', cost: 0 },
+              { time: '09:30 - 12:30', title: activeDay.morning.activity, cat: 'attraction', color: '#2563eb', cost: activeDay.morning.cost },
+              { time: '12:30 - 14:00', title: `Lunch: ${activeDay.lunch?.restaurant || 'Traditional Chaykhana'}`, cat: 'food', color: '#f59e0b', cost: activeDay.lunch?.cost || 10 },
+              { time: '14:00 - 14:15', title: 'Walking / Taxi Transit Gap', cat: 'transport', color: '#06b6d4', cost: 1.5 },
+              { time: '14:15 - 17:30', title: activeDay.afternoon.activity, cat: 'shopping', color: '#ec4899', cost: activeDay.afternoon.cost },
+              { time: '17:30 - 18:30', title: 'Rest & Hotel Refreshment Buffer', cat: 'lodging', color: '#10b981', cost: 0 },
+              { time: '18:30 - 21:00', title: `Dinner: ${activeDay.evening.restaurant}`, cat: 'food', color: '#8b5cf6', cost: activeDay.evening.cost }
+            ].map((slot, idx) => (
+              <div
+                key={idx}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '140px 1fr 100px',
+                  alignItems: 'center',
+                  padding: '12px 16px',
+                  borderRadius: '12px',
+                  background: 'var(--color-bg, #090d1a)',
+                  border: '1px solid var(--glass-border)',
+                  borderLeft: `4px solid ${slot.color}`,
+                }}
+              >
+                <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--color-text-muted)' }}>
+                  {slot.time}
+                </span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#ffffff' }}>
+                  {slot.title}
+                </span>
+                <strong style={{ fontSize: '0.85rem', color: '#10b981', textAlign: 'right' }}>
+                  {slot.cost === 0 ? 'Included' : formatPrice(slot.cost)}
+                </strong>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ==================== WORKSPACE MODE 3: FULL MAP VIEW ==================== */}
+      {viewMode === 'map' && (
+        <div style={{ height: '70vh', minHeight: '480px' }}>
+          <TripMap
+            locations={mapPoints}
+            interactive={true}
+            height="100%"
+            onSelectLocation={(id) => {
+              const match = mapPoints.find((m) => m.id === id);
+              if (match) {
+                setSelectedPlaceForModal({
+                  title: match.title,
+                  category: match.category,
+                  location: match.address,
+                  cost: match.cost,
+                  isVerified: match.isVerified
+                });
+              }
+            }}
+          />
+        </div>
+      )}
+
+      {/* ==================== EMBEDDED READY TOURS SECTION ==================== */}
+      <div style={{ marginTop: '24px' }}>
+        <ReadyToursSection
+          destination={trip.destination}
+          durationDays={trip.rawTripData.days?.length || 5}
+          travelersCount={trip.travelers || 2}
+          estimatedBudgetUSD={trip.rawTripData.totalCost || 1200}
+          showComparisonOption={true}
+        />
+      </div>
+
+      {/* ==================== PLACE DETAIL MODAL ==================== */}
+      {selectedPlaceForModal && (
+        <PlaceDetailModal
+          place={selectedPlaceForModal}
+          isOpen={Boolean(selectedPlaceForModal)}
+          onClose={() => setSelectedPlaceForModal(null)}
+          onAddToTrip={() => {
+            alert('Added to your day itinerary!');
+            setSelectedPlaceForModal(null);
+          }}
+        />
+      )}
+
+      {/* ==================== IN-TRIP ADAPTATION DIFF DRAWER ==================== */}
+      {showAdaptationDrawer && adaptationDiff && (
+        <AnimatePresence>
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.75)',
+              backdropFilter: 'blur(8px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1200,
+              padding: '16px',
+            }}
+            onClick={() => setShowAdaptationDrawer(false)}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--color-text-primary)', margin: 0 }}>
-                {getLocalText('Add Activity')}
-              </h3>
-              <button onClick={() => setIsAddModalOpen(false)} style={{ color: 'var(--color-text-muted)', border: 'none', background: 'transparent', cursor: 'pointer' }}>
-                <X size={18} />
-              </button>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%',
+                maxWidth: '520px',
+                background: 'var(--color-bg-surface, #0f172a)',
+                border: '1px solid var(--glass-border, rgba(255,255,255,0.12))',
+                borderRadius: '20px',
+                padding: '24px',
+                boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                textAlign: 'left',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Zap size={18} style={{ color: '#f59e0b' }} />
+                  <span style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: '#f59e0b' }}>
+                    Live In-Trip Adaptation
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowAdaptationDrawer(false)}
+                  style={{ color: 'var(--color-text-muted)', border: 'none', cursor: 'pointer' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#ffffff' }}>
+                  Proposed Day {activeDay.day} Schedule Rebalance
+                </h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
+                  {activeAdaptationPrompt ? `Triggered by: "${activeAdaptationPrompt}" • ` : ''}Reason: {adaptationDiff.reason}. The adaptation engine reorganizes remaining slots without wiping booked hotel nights:
+                </p>
+              </div>
+
+              {/* Diff Preview */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '10px 12px', borderRadius: '10px' }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ef4444', textTransform: 'uppercase' }}>
+                    🔴 Removing Outdoor / High-Exertion Slot:
+                  </span>
+                  <div style={{ fontSize: '0.85rem', color: '#ffffff', marginTop: '2px' }}>
+                    {adaptationDiff.removing[0]}
+                  </div>
+                </div>
+
+                <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '10px 12px', borderRadius: '10px' }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#10b981', textTransform: 'uppercase' }}>
+                    🟢 Substituting Sheltered / Relaxed Alternative:
+                  </span>
+                  <div style={{ fontSize: '0.85rem', color: '#ffffff', marginTop: '2px' }}>
+                    {adaptationDiff.adding[0]}
+                  </div>
+                </div>
+              </div>
+
+              {/* Metrics impact */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                <span>💰 Budget impact: {adaptationDiff.costImpactUSD <= 0 ? 'Saved' : '+'} {formatPrice(Math.abs(adaptationDiff.costImpactUSD))}</span>
+                <span>🚶 Walking saved: {adaptationDiff.walkingSavedKm} km</span>
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                <button
+                  onClick={() => setShowAdaptationDrawer(false)}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--glass-border)',
+                    background: 'transparent',
+                    color: 'var(--color-text-secondary)',
+                    fontWeight: 700,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Discard & Keep Original
+                </button>
+                <button
+                  onClick={handleApplyAdaptation}
+                  className="btn-premium"
+                  style={{
+                    flex: 1.4,
+                    padding: '10px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    fontWeight: 800,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Apply Schedule Swap
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        </AnimatePresence>
+      )}
+
+      {/* ==================== ADD ACTIVITY MODAL ==================== */}
+      {isAddModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1200,
+            padding: '16px',
+          }}
+          onClick={() => setIsAddModalOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: '440px',
+              background: 'var(--color-bg-surface, #0f172a)',
+              border: '1px solid var(--glass-border)',
+              borderRadius: '20px',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+              textAlign: 'left',
+            }}
+          >
+            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#ffffff' }}>
+              Add Activity to Day {activeDay.day}
+            </h3>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                Activity Title
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Gur-e-Amir Night Illumination"
+                value={customActivity.activity}
+                onChange={(e) => setCustomActivity({ ...customActivity, activity: e.target.value })}
+                style={{ width: '100%', padding: '10px 12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: '#ffffff', fontSize: '0.85rem' }}
+              />
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Target Time block</label>
-                <select 
+            <div>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                Category
+              </label>
+              <select
+                value={customActivity.category}
+                onChange={(e) => setCustomActivity({ ...customActivity, category: e.target.value as ActivityCategory })}
+                style={{ width: '100%', padding: '10px 12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: '#ffffff', fontSize: '0.85rem' }}
+              >
+                <option value="attraction">Attraction / Monument</option>
+                <option value="food">Restaurant / Food</option>
+                <option value="cafe">Cafe / Teahouse</option>
+                <option value="shopping">Shopping / Bazaar</option>
+                <option value="entertainment">Entertainment / Show</option>
+                <option value="transport">Transport / Transfer</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                  Slot
+                </label>
+                <select
                   value={customActivity.section}
-                  onChange={(e) => setCustomActivity({ ...customActivity, section: e.target.value })}
-                  style={{ padding: '10px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--color-text-primary)', fontSize: '0.9rem' }}
+                  onChange={(e) => setCustomActivity({ ...customActivity, section: e.target.value as any })}
+                  style={{ width: '100%', padding: '10px 12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: '#ffffff', fontSize: '0.85rem' }}
                 >
-                  <option value="morning">Morning block</option>
-                  <option value="afternoon">Afternoon block</option>
+                  <option value="morning">Morning</option>
+                  <option value="afternoon">Afternoon</option>
+                  <option value="evening">Evening</option>
                 </select>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>{getLocalText('Activity Name')}</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Visit Chorsu dome bazaar"
-                  value={customActivity.activity}
-                  onChange={(e) => setCustomActivity({ ...customActivity, activity: e.target.value })}
-                  style={{ padding: '10px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--color-text-primary)' }}
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                  Cost ({currency})
+                </label>
+                <input
+                  type="number"
+                  value={customActivity.cost}
+                  onChange={(e) => setCustomActivity({ ...customActivity, cost: Number(e.target.value) })}
+                  style={{ width: '100%', padding: '10px 12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: '#ffffff', fontSize: '0.85rem' }}
                 />
               </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>{getLocalText('Location')}</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Tashkent Old City"
-                  value={customActivity.location}
-                  onChange={(e) => setCustomActivity({ ...customActivity, location: e.target.value })}
-                  style={{ padding: '10px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--color-text-primary)' }}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>{getLocalText('Duration')}</label>
-                  <input 
-                    type="text" 
-                    value={customActivity.duration}
-                    onChange={(e) => setCustomActivity({ ...customActivity, duration: e.target.value })}
-                    style={{ padding: '10px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--color-text-primary)' }}
-                  />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>{getLocalText('Cost')} ($)</label>
-                  <input 
-                    type="number" 
-                    value={customActivity.cost}
-                    onChange={(e) => setCustomActivity({ ...customActivity, cost: Number(e.target.value) })}
-                    style={{ padding: '10px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--color-text-primary)' }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>{getLocalText('Notes/Tips')}</label>
-                <textarea 
-                  placeholder="Additional advices..."
-                  value={customActivity.tip}
-                  onChange={(e) => setCustomActivity({ ...customActivity, tip: e.target.value })}
-                  rows={2}
-                  style={{ padding: '10px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--color-text-primary)', resize: 'none' }}
-                />
-              </div>
-
             </div>
 
-            <button 
-              onClick={handleAddActivity}
-              className="btn-premium"
-              style={{ width: '100%', padding: '12px', border: 'none', marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-            >
-              <Plus size={16} /> Append to Timeline
-            </button>
-          </motion.div>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+              <button
+                onClick={() => setIsAddModalOpen(false)}
+                style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (!customActivity.activity.trim()) return;
+                  const currentDays = [...trip.rawTripData.days];
+                  const d = { ...currentDays[activeDayIdx] };
+                  if (customActivity.section === 'morning') {
+                    d.morning = {
+                      activity: customActivity.activity,
+                      category: customActivity.category,
+                      location: `${trip.destination?.split(',')[0]} Center`,
+                      duration: customActivity.duration,
+                      cost: customActivity.cost,
+                      isVerified: false
+                    };
+                  } else if (customActivity.section === 'afternoon') {
+                    d.afternoon = {
+                      activity: customActivity.activity,
+                      category: customActivity.category,
+                      location: `${trip.destination?.split(',')[0]} Center`,
+                      duration: customActivity.duration,
+                      cost: customActivity.cost,
+                      isVerified: false
+                    };
+                  }
+                  currentDays[activeDayIdx] = d;
+                  persistTrip({ ...trip, rawTripData: { ...trip.rawTripData, days: currentDays } });
+                  setIsAddModalOpen(false);
+                }}
+                className="btn-primary"
+                style={{ flex: 1, padding: '10px', borderRadius: '8px', cursor: 'pointer' }}
+              >
+                Add Activity
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Responsive details style injections */}
+      {/* Responsive Layout CSS helper */}
       <style dangerouslySetInnerHTML={{ __html: `
-        @media (max-width: 992px) {
-          .details-main-grid {
+        @media (max-width: 900px) {
+          .workspace-split-grid {
             grid-template-columns: 1fr !important;
           }
         }
@@ -1194,14 +1399,3 @@ export const TripDetailsView: React.FC<TripDetailsViewProps> = ({ tripId, onBack
     </div>
   );
 };
-
-// Loader asset inside component
-const LoaderComponent = () => (
-  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-    <svg className="animate-spin" style={{ animation: 'spin 1s linear infinite', width: '36px', height: '36px' }} viewBox="0 0 24 24" fill="none">
-      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" style={{ opacity: 0.25 }} />
-      <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-    </svg>
-    <span style={{ fontSize: '0.85rem' }}>Loading active trip details...</span>
-  </div>
-);

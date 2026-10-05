@@ -6,12 +6,18 @@ from app.config import settings
 db_url = settings.DATABASE_URL
 if db_url.startswith("postgresql://"):
     db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+elif db_url.startswith("sqlite://") and not db_url.startswith("sqlite+aiosqlite://"):
+    db_url = db_url.replace("sqlite://", "sqlite+aiosqlite://", 1)
+
+connect_args = {"check_same_thread": False} if "sqlite" in db_url else {}
+pool_pre_ping = True if "postgresql" in db_url else False
 
 engine = create_async_engine(
     db_url,
     echo=False,
     future=True,
-    pool_pre_ping=True,
+    pool_pre_ping=pool_pre_ping,
+    connect_args=connect_args,
 )
 
 AsyncSessionLocal = async_sessionmaker(

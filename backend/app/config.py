@@ -10,7 +10,7 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str = Field(
-        default="postgresql+asyncpg://postgres:postgres@localhost:5432/traveluz"
+        default=os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./traveluz.db")
     )
 
     # JWT Security
@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     TELEGRAM_ENCRYPTION_KEY: str = Field(
         default="secret_encryption_key_for_telegram_bot_tokens_32b!"
     )
+    GOOGLE_MAPS_API_KEY: str = Field(default="")
+    GOOGLE_PLACES_API_KEY: str = Field(default="")
+    TRAVEL_CACHE_TTL_SECONDS: int = Field(default=3600)
 
     # CORS
     CORS_ORIGINS: Union[str, List[str]] = [

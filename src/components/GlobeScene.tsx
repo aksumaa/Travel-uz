@@ -1,10 +1,11 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import * as THREE from 'three';
-import { useFrame } from '@react-three/fiber';
-import { OrbitControls, Stars, useTexture, Line, Html } from '@react-three/drei';
+import { useFrame, useThree } from '@react-three/fiber';
+import { OrbitControls, Stars, useTexture, Html } from '@react-three/drei';
 import gsap from 'gsap';
-import { COUNTRY_DETAILS_DB } from './CountryInfoPanel';
 import type { CountryData } from './CountryInfoPanel';
+import { DESTINATIONS_CATALOG, type DestinationItem, resolveDestination } from '../services/destinationCatalog';
+import { FlightPathAnimation, toXYZ } from './FlightPathAnimation';
 
 export interface GlobeCountryData extends CountryData {
   id: string;
@@ -12,16 +13,32 @@ export interface GlobeCountryData extends CountryData {
   lon: number;
 }
 
-export const COUNTRIES: GlobeCountryData[] = [
-  { ...COUNTRY_DETAILS_DB.uzbekistan, id: 'uzbekistan', lat: 41.2995, lon: 69.2401 },
-  { ...COUNTRY_DETAILS_DB.usa, id: 'usa', lat: 40.7128, lon: -74.0060 },
-  { ...COUNTRY_DETAILS_DB.france, id: 'france', lat: 48.8566, lon: 2.3522 },
-  { ...COUNTRY_DETAILS_DB.japan, id: 'japan', lat: 35.6762, lon: 139.6503 },
-  { ...COUNTRY_DETAILS_DB.brazil, id: 'brazil', lat: -22.9068, lon: -43.1729 },
-  { ...COUNTRY_DETAILS_DB.australia, id: 'australia', lat: -33.8688, lon: 151.2093 },
-  { ...COUNTRY_DETAILS_DB.egypt, id: 'egypt', lat: 30.0444, lon: 31.2357 },
-  { ...COUNTRY_DETAILS_DB.turkey, id: 'turkey', lat: 38.9637, lon: 35.2433 }
-];
+export const COUNTRIES: GlobeCountryData[] = DESTINATIONS_CATALOG.map(d => ({
+  name: d.name,
+  capital: d.capital || d.name,
+  language: d.language,
+  currency: d.currency,
+  timezone: d.timezone,
+  population: 'Verified Regional Hub',
+  area: '450,000 km²',
+  flag: d.flag,
+  weather: d.weather ? { temp: d.weather.tempC, condition: d.weather.condition } : { temp: 22, condition: 'Sunny' },
+  visa: d.visaVerified?.status || 'Verified Destination',
+  bestTime: d.bestSeason || 'Spring & Autumn',
+  description: d.description,
+  attractions: d.places.map(p => ({
+    name: p.name,
+    city: d.name,
+    image: p.imageUrl || d.popularDestinations[0]?.image || 'https://images.unsplash.com/photo-1587974928442-77dc3e0dba72?auto=format&fit=crop&w=400&q=80'
+  })),
+  foods: d.restaurants.map(r => ({
+    name: r.specialty,
+    image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=400&q=80'
+  })),
+  id: d.id,
+  lat: d.lat,
+  lon: d.lng
+}));
 
 export interface City {
   name: string;
@@ -31,23 +48,18 @@ export interface City {
 }
 
 const CITIES: City[] = [
-  { name: 'Tashkent', lat: 41.2, lng: 69.2, type: 'capital' },
-  { name: 'Istanbul', lat: 41.0, lng: 28.9, type: 'popular' },
-  { name: 'Dubai', lat: 25.2, lng: 55.2, type: 'popular' },
-  { name: 'Paris', lat: 48.8, lng: 2.3, type: 'popular' },
-  { name: 'Tokyo', lat: 35.6, lng: 139.6, type: 'popular' },
-  { name: 'New York', lat: 40.7, lng: -74.0, type: 'popular' },
+  { name: 'Tashkent', lat: 41.2995, lng: 69.2401, type: 'capital' },
+  { name: 'Samarkand', lat: 39.6542, lng: 66.9597, type: 'popular' },
+  { name: 'Cappadocia', lat: 38.6431, lng: 34.8289, type: 'popular' },
+  { name: 'Istanbul', lat: 41.0082, lng: 28.9784, type: 'popular' },
+  { name: 'Dubai', lat: 25.2048, lng: 55.2708, type: 'popular' },
+  { name: 'Paris', lat: 48.8566, lng: 2.3522, type: 'popular' },
+  { name: 'Tokyo', lat: 35.6762, lng: 139.6503, type: 'popular' },
+  { name: 'New York', lat: 40.7128, lng: -74.006, type: 'popular' },
+  { name: 'Cairo', lat: 30.0444, lng: 31.2357, type: 'popular' }
 ];
 
-export const toXYZ = (lat: number, lng: number, r = 2.52): [number, number, number] => {
-  const phi = (90 - lat) * Math.PI / 180;
-  const theta = (lng + 180) * Math.PI / 180;
-  return [
-    -r * Math.sin(phi) * Math.cos(theta),
-    r * Math.cos(phi),
-    r * Math.sin(phi) * Math.sin(theta)
-  ];
-};
+export { toXYZ };
 
 const xyzToLatLng = (x: number, y: number, z: number, r = 2.5): { lat: number; lng: number } => {
   const phi = Math.acos(Math.max(-1, Math.min(1, y / r)));
@@ -101,9 +113,9 @@ function calculateBBox(geometry: any): [number, number, number, number] {
   return [minLon, minLat, maxLon, maxLat];
 }
 
-const getResponsiveSegments = () => (typeof window !== 'undefined' && window.innerWidth < 768 ? 36 : 64);
+const getResponsiveSegments = () => (typeof window !== 'undefined' && window.innerWidth < 768 ? 40 : 64);
 
-// Atmosphere Glowing Shader
+// Subtle Realistic Rayleigh-inspired Atmosphere
 const Atmosphere: React.FC = () => {
   const segments = useMemo(() => getResponsiveSegments(), []);
   const vertexShader = `
@@ -117,14 +129,14 @@ const Atmosphere: React.FC = () => {
   const fragmentShader = `
     varying vec3 vNormal;
     void main() {
-      float intensity = pow(0.7 - dot(vNormal, vec3(0,0,1.0)), 2.0);
-      gl_FragColor = vec4(0.3, 0.6, 1.0, 1.0) * intensity;
+      float intensity = pow(0.65 - dot(vNormal, vec3(0,0,1.0)), 2.2);
+      gl_FragColor = vec4(0.2, 0.45, 0.9, 0.75) * intensity;
     }
   `;
 
   return (
     <mesh>
-      <sphereGeometry args={[2.58, segments, segments]} />
+      <sphereGeometry args={[2.57, segments, segments]} />
       <shaderMaterial
         vertexShader={vertexShader}
         fragmentShader={fragmentShader}
@@ -137,7 +149,7 @@ const Atmosphere: React.FC = () => {
   );
 };
 
-// Earth Clouds Layer
+// Realistic Cloud Layer with Gentle Spin
 const Clouds: React.FC = () => {
   const cloudsRef = useRef<THREE.Mesh>(null);
   const cloudsTexture = useTexture('/textures/earth_clouds.jpg');
@@ -145,24 +157,24 @@ const Clouds: React.FC = () => {
 
   useFrame(() => {
     if (cloudsRef.current) {
-      cloudsRef.current.rotation.y += 0.0003;
+      cloudsRef.current.rotation.y += 0.00025;
     }
   });
 
   return (
     <mesh ref={cloudsRef}>
-      <sphereGeometry args={[2.52, segments, segments]} />
+      <sphereGeometry args={[2.518, segments, segments]} />
       <meshPhongMaterial
         map={cloudsTexture}
         transparent={true}
-        opacity={0.4}
+        opacity={0.35}
         depthWrite={false}
       />
     </mesh>
   );
 };
 
-// Earth Base Sphere
+// Earth Base Sphere with NASA Blue Marble & Normal Maps
 interface EarthMeshProps {
   onPointerMove: (e: any) => void;
   onPointerOut: () => void;
@@ -194,13 +206,91 @@ const EarthMesh: React.FC<EarthMeshProps> = ({
         map={textures.map}
         normalMap={textures.normalMap}
         specularMap={textures.specularMap}
-        shininess={15}
+        shininess={18}
       />
     </mesh>
   );
 };
 
-// City Pin Component with scale pulsing ring
+// Dedicated Accurate Destination Marker Component
+interface DestinationMarkerProps {
+  destination: DestinationItem;
+  isFocused?: boolean;
+}
+
+const DestinationMarker: React.FC<DestinationMarkerProps> = ({ destination, isFocused = true }) => {
+  const ringRef = useRef<THREE.Mesh>(null);
+  const pos = useMemo(() => toXYZ(destination.lat, destination.lng, 2.52), [destination.lat, destination.lng]);
+
+  useFrame((state) => {
+    if (ringRef.current) {
+      const elapsed = state.clock.getElapsedTime();
+      const scale = 1.0 + (elapsed * 2.2) % 2.0;
+      const opacity = 1.0 - (scale - 1.0) / 2.0;
+      ringRef.current.scale.setScalar(scale);
+      if (ringRef.current.material) {
+        (ringRef.current.material as THREE.Material).opacity = opacity;
+      }
+    }
+  });
+
+  return (
+    <group position={pos}>
+      <group ref={(el) => {
+        if (el) {
+          const target = new THREE.Vector3(...pos).multiplyScalar(2);
+          el.lookAt(target);
+        }
+      }}>
+        {/* Core Pin Needle */}
+        <mesh position={[0, 0, 0.04]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.008, 0.003, 0.08, 12]} />
+          <meshBasicMaterial color="#F59E0B" />
+        </mesh>
+
+        {/* Top Bead */}
+        <mesh position={[0, 0, 0.08]}>
+          <sphereGeometry args={[0.035, 16, 16]} />
+          <meshStandardMaterial color="#F59E0B" emissive="#F59E0B" emissiveIntensity={0.6} />
+        </mesh>
+
+        {/* Pulsing Radar Ring */}
+        <mesh ref={ringRef} position={[0, 0, 0.002]}>
+          <ringGeometry args={[0.04, 0.08, 32]} />
+          <meshBasicMaterial color="#F59E0B" transparent opacity={0.8} depthWrite={false} />
+        </mesh>
+
+        {/* Floating Label */}
+        {isFocused && (
+          <Html distanceFactor={4.5} center position={[0, 0.16, 0]}>
+            <div style={{
+              background: 'rgba(15, 23, 42, 0.92)',
+              color: '#ffffff',
+              padding: '6px 12px',
+              borderRadius: '20px',
+              border: '1px solid rgba(245, 158, 11, 0.5)',
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              whiteSpace: 'nowrap',
+              fontFamily: "'Outfit', sans-serif",
+              backdropFilter: 'blur(8px)',
+              pointerEvents: 'none',
+              boxShadow: '0 6px 16px rgba(0,0,0,0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <span>{destination.flag}</span>
+              <span style={{ color: '#F59E0B' }}>{destination.name}</span>
+            </div>
+          </Html>
+        )}
+      </group>
+    </group>
+  );
+};
+
+// City Pin Component
 interface CityPinProps {
   city: City;
   isHovered: boolean;
@@ -249,13 +339,13 @@ const CityPin: React.FC<CityPinProps> = ({ city, isHovered, onHover, onClick }) 
             onClick();
           }}
         >
-          <sphereGeometry args={[0.03, 16, 16]} />
+          <sphereGeometry args={[0.024, 16, 16]} />
           <meshBasicMaterial color={city.type === 'capital' ? '#F59E0B' : '#60A5FA'} />
         </mesh>
 
         {/* Pulsing ring */}
         <mesh ref={ringRef}>
-          <ringGeometry args={[0.032, 0.055, 32]} />
+          <ringGeometry args={[0.026, 0.048, 32]} />
           <meshBasicMaterial 
             color={city.type === 'capital' ? '#F59E0B' : '#60A5FA'} 
             transparent={true} 
@@ -265,15 +355,15 @@ const CityPin: React.FC<CityPinProps> = ({ city, isHovered, onHover, onClick }) 
 
         {/* Label Projected Html overlay */}
         {isHovered && (
-          <Html distanceFactor={4} center position={[0, 0.1, 0]}>
+          <Html distanceFactor={4.5} center position={[0, 0.1, 0]}>
             <div style={{
-              background: 'rgba(15, 23, 42, 0.85)',
+              background: 'rgba(15, 23, 42, 0.88)',
               color: '#ffffff',
               padding: '4px 10px',
               borderRadius: '8px',
               border: '1px solid rgba(255, 255, 255, 0.15)',
               fontSize: '0.7rem',
-              fontWeight: 800,
+              fontWeight: 700,
               whiteSpace: 'nowrap',
               fontFamily: "'Outfit', sans-serif",
               backdropFilter: 'blur(8px)',
@@ -298,75 +388,42 @@ const CityPin: React.FC<CityPinProps> = ({ city, isHovered, onHover, onClick }) 
   );
 };
 
-// Flight Arc Path Component
-interface FlightArcProps {
-  from: City;
-  to: City;
-}
-
-const FlightArc: React.FC<FlightArcProps> = ({ from, to }) => {
-  const curve = useMemo(() => {
-    const start = new THREE.Vector3(...toXYZ(from.lat, from.lng, 2.5));
-    const end = new THREE.Vector3(...toXYZ(to.lat, to.lng, 2.5));
-    const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
-    const normal = mid.clone().normalize();
-    const controlPoint = mid.add(normal.multiplyScalar(1.5));
-    return new THREE.QuadraticBezierCurve3(start, controlPoint, end);
-  }, [from, to]);
-
-  const points = useMemo(() => curve.getPoints(50), [curve]);
-  const dotRef = useRef<THREE.Mesh>(null);
-  const progress = useRef(Math.random());
-
-  useFrame(() => {
-    progress.current += 0.002;
-    if (progress.current > 1) progress.current = 0;
-    if (dotRef.current) {
-      const pos = curve.getPointAt(progress.current);
-      dotRef.current.position.copy(pos);
-    }
-  });
-
-  return (
-    <group>
-      <Line
-        points={points}
-        color="#F59E0B"
-        lineWidth={0.5}
-        transparent
-        opacity={0.3}
-      />
-      <mesh ref={dotRef}>
-        <sphereGeometry args={[0.02, 16, 16]} />
-        <meshBasicMaterial color="#F59E0B" transparent opacity={0.9} blending={THREE.AdditiveBlending} />
-      </mesh>
-    </group>
-  );
-};
-
 interface GlobeSceneProps {
   activeSelectedId: string | null;
+  activeDestination?: DestinationItem | null;
+  previousDestination?: DestinationItem | null;
+  flightActive?: boolean;
   selectedCountryFeature: any;
   hoveredCountryFeature: any;
   onHoverCountryFeatureChange: (feature: any) => void;
   onSelectCountryFeatureChange: (feature: any) => void;
   onCountrySelect?: (country: CountryData) => void;
+  onDestinationSelect?: (destination: DestinationItem) => void;
   onSelectCountry?: (countryId: string) => void;
+  onFlightArrival?: () => void;
   autoRotate: boolean;
   setAutoRotate: (val: boolean) => void;
+  zoomLevel?: number;
 }
 
 export const GlobeScene: React.FC<GlobeSceneProps> = ({
   activeSelectedId,
+  activeDestination,
+  previousDestination,
+  flightActive = false,
   selectedCountryFeature,
   hoveredCountryFeature,
   onHoverCountryFeatureChange,
   onSelectCountryFeatureChange,
   onCountrySelect,
+  onDestinationSelect,
   onSelectCountry,
+  onFlightArrival,
   autoRotate,
-  setAutoRotate
+  setAutoRotate,
+  zoomLevel = 1
 }) => {
+  const { camera } = useThree();
   const [geoJsonData, setGeoJsonData] = useState<any>(null);
   const [hoveredCityName, setHoveredCityName] = useState<string | null>(null);
 
@@ -375,6 +432,18 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
   const scaleRef = useRef(0.1);
   const hoverTimeoutRef = useRef<any>(null);
+
+  // Smooth camera zoom response to zoomLevel prop
+  useEffect(() => {
+    if (zoomLevel) {
+      const targetZ = THREE.MathUtils.clamp(5.8 / zoomLevel, 3.2, 7.8);
+      gsap.to(camera.position, {
+        z: targetZ,
+        duration: 0.45,
+        ease: 'power2.out'
+      });
+    }
+  }, [zoomLevel, camera]);
 
   // Load Boundaries GeoJSON
   useEffect(() => {
@@ -389,24 +458,33 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
       .catch((err) => console.error("Error loading boundaries GeoJSON in Scene:", err));
   }, []);
 
-  // Sync selected country snapshot & focus rotation snap
+  // Smooth camera/globe rotation whenever active destination or selected country changes
   useEffect(() => {
-    if (!activeSelectedId) {
+    let targetLat = 41.2995;
+    let targetLng = 69.2401;
+    let countryName = 'Uzbekistan';
+
+    if (activeDestination) {
+      targetLat = activeDestination.lat;
+      targetLng = activeDestination.lng;
+      countryName = activeDestination.country;
+    } else if (activeSelectedId) {
+      const resolved = resolveDestination(activeSelectedId);
+      if (resolved) {
+        targetLat = resolved.lat;
+        targetLng = resolved.lng;
+        countryName = resolved.country;
+      }
+    } else {
       if (selectedCountryFeature) {
         onSelectCountryFeatureChange(null);
       }
       return;
     }
 
-    const country = COUNTRIES.find(
-      (c) => c.id === activeSelectedId.toLowerCase() || c.name.toLowerCase() === activeSelectedId.toLowerCase()
-    );
-
-    if (!country) return;
-
     if (groupRef.current) {
-      const latRad = (country.lat! * Math.PI) / 180;
-      const lonRad = (country.lon! * Math.PI) / 180;
+      const latRad = (targetLat * Math.PI) / 180;
+      const lonRad = (targetLng * Math.PI) / 180;
       const targetY = -lonRad;
       const targetX = latRad;
 
@@ -415,24 +493,24 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
       gsap.to(groupRef.current.rotation, {
         x: targetX,
         y: targetY,
-        duration: 1.5,
-        ease: 'power3.out',
+        duration: 1.6,
+        ease: 'power2.out',
       });
     }
 
-    // Resolve GeoJSON feature representation for selected highlight borders
+    // Resolve GeoJSON feature representation for boundary highlight
     if (geoJsonData) {
       const match = geoJsonData.features.find((f: any) => {
         const name = f.properties.NAME.toLowerCase();
-        return name === country.name.toLowerCase() || country.name.toLowerCase().includes(name);
+        return name === countryName.toLowerCase() || countryName.toLowerCase().includes(name);
       });
       if (match && selectedCountryFeature?.properties?.ISO_A3 !== match.properties.ISO_A3) {
         onSelectCountryFeatureChange(match);
       }
     }
-  }, [activeSelectedId, geoJsonData, setAutoRotate, onSelectCountryFeatureChange]);
+  }, [activeSelectedId, activeDestination, geoJsonData, setAutoRotate, onSelectCountryFeatureChange]);
 
-  // Merge static borders
+  // Static borders geometry
   const bordersGeometry = useMemo(() => {
     if (!geoJsonData) return null;
     const points: number[] = [];
@@ -468,7 +546,7 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
     return geometry;
   }, [geoJsonData]);
 
-  // Selected borders highlight with disposal cleanup
+  // Selected borders highlight
   const selectedBordersGeom = useMemo(() => {
     if (!selectedCountryFeature) return null;
     const points: number[] = [];
@@ -502,14 +580,7 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
     return geometry;
   }, [selectedCountryFeature]);
 
-  // Clean up selected borders geometry
-  useEffect(() => {
-    return () => {
-      if (selectedBordersGeom) selectedBordersGeom.dispose();
-    };
-  }, [selectedBordersGeom]);
-
-  // Hovered borders highlight with disposal cleanup
+  // Hovered borders highlight
   const hoveredBordersGeom = useMemo(() => {
     if (!hoveredCountryFeature) return null;
     const points: number[] = [];
@@ -542,13 +613,6 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
     return geometry;
   }, [hoveredCountryFeature]);
-
-  // Clean up hovered borders geometry
-  useEffect(() => {
-    return () => {
-      if (hoveredBordersGeom) hoveredBordersGeom.dispose();
-    };
-  }, [hoveredBordersGeom]);
 
   const findCountryAt = (lon: number, lat: number) => {
     if (!geoJsonData) return null;
@@ -628,16 +692,43 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
         setAutoRotate(false);
 
         const name = countryFeature.properties.NAME;
+        const resolved = resolveDestination(name);
+
+        if (resolved && onDestinationSelect) {
+          onDestinationSelect(resolved);
+        }
+
         const normalizedId = name.toLowerCase().includes('united states') ? 'usa' :
                              name.toLowerCase().includes('united arab') ? 'egypt' : 
-                             name.toLowerCase().includes('maldives') ? 'egypt' :
                              name.toLowerCase();
 
-        const matchingDb = Object.values(COUNTRY_DETAILS_DB).find(
-          (c) => c.name.toLowerCase() === name.toLowerCase() || name.toLowerCase().includes(c.name.toLowerCase())
-        );
+        if (onSelectCountry) {
+          onSelectCountry(normalizedId);
+        }
 
-        const details: CountryData = matchingDb || {
+        const details: CountryData = resolved ? {
+          name: resolved.name,
+          capital: resolved.capital || 'Capital',
+          language: resolved.language,
+          currency: resolved.currency,
+          timezone: resolved.timezone,
+          population: 'Regional Hub',
+          area: '450,000 km²',
+          flag: resolved.flag,
+          weather: resolved.weather ? { temp: resolved.weather.tempC, condition: resolved.weather.condition } : { temp: 22, condition: 'Sunny' },
+          visa: resolved.visaVerified?.status || 'Verified Destination',
+          bestTime: resolved.bestSeason || 'Spring & Autumn',
+          description: resolved.description,
+          attractions: resolved.places.map(p => ({
+            name: p.name,
+            city: resolved.name,
+            image: p.imageUrl || 'https://images.unsplash.com/photo-1587974928442-77dc3e0dba72?auto=format&fit=crop&w=400&q=80'
+          })),
+          foods: resolved.restaurants.map(r => ({
+            name: r.specialty,
+            image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=400&q=80'
+          }))
+        } : {
           name: name,
           capital: countryFeature.properties.FORMAL_EN?.split(' ').pop() || 'Unknown',
           language: 'English',
@@ -656,9 +747,6 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
 
         if (onCountrySelect) {
           onCountrySelect(details);
-        }
-        if (onSelectCountry) {
-          onSelectCountry(normalizedId);
         }
       }
     }
@@ -680,36 +768,24 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
     }
   });
 
-  const flightPairs = useMemo(() => {
-    const tashkent = CITIES.find((c) => c.name === 'Tashkent')!;
-    const dubai = CITIES.find((c) => c.name === 'Dubai')!;
-    const paris = CITIES.find((c) => c.name === 'Paris')!;
-    const tokyo = CITIES.find((c) => c.name === 'Tokyo')!;
-    const ny = CITIES.find((c) => c.name === 'New York')!;
-
-    return [
-      { from: tashkent, to: paris },
-      { from: paris, to: ny },
-      { from: tokyo, to: dubai }
-    ];
-  }, []);
-
   return (
     <>
-      <ambientLight intensity={0.3} />
-      <directionalLight position={[5, 3, 5]} intensity={1.2} color="#FFF5E4" />
-      <pointLight position={[-10, -10, -10]} intensity={0.1} />
+      {/* Natural Sun and Ambient Lighting */}
+      <ambientLight intensity={0.4} />
+      <directionalLight position={[6, 4, 5]} intensity={1.3} color="#FFF8E7" />
+      <pointLight position={[-8, -8, -8]} intensity={0.15} color="#60A5FA" />
 
+      {/* Responsive Orbit Controls with smooth physics damping */}
       <OrbitControls
         enableZoom={true}
-        minDistance={3.5}
+        minDistance={3.2}
         maxDistance={8}
         enablePan={false}
         enableDamping={true}
         dampingFactor={0.05}
       />
 
-      <Stars radius={100} depth={50} count={6000} factor={4} saturation={0} fade speed={1} />
+      <Stars radius={100} depth={50} count={5000} factor={3.5} saturation={0} fade speed={1} />
 
       <group ref={groupRef}>
         <EarthMesh
@@ -724,24 +800,28 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
 
         <Atmosphere />
 
+        {/* Global Political Boundaries */}
         {bordersGeometry && (
           <lineSegments geometry={bordersGeometry}>
-            <lineBasicMaterial color="#ffffff" transparent opacity={0.15} toneMapped={false} />
+            <lineBasicMaterial color="#ffffff" transparent opacity={0.16} toneMapped={false} />
           </lineSegments>
         )}
 
+        {/* Hovered Country Border Highlight */}
         {hoveredBordersGeom && (
           <lineSegments geometry={hoveredBordersGeom}>
             <lineBasicMaterial color="#60A5FA" transparent opacity={0.5} toneMapped={false} />
           </lineSegments>
         )}
 
+        {/* Selected Country Border Highlight */}
         {selectedBordersGeom && (
           <lineSegments geometry={selectedBordersGeom}>
-            <lineBasicMaterial color="#60A5FA" linewidth={2} transparent opacity={1} toneMapped={false} />
+            <lineBasicMaterial color="#F59E0B" linewidth={2} transparent opacity={0.9} toneMapped={false} />
           </lineSegments>
         )}
 
+        {/* Major Hub City Pins */}
         {CITIES.map((city, idx) => (
           <CityPin
             key={idx}
@@ -749,30 +829,37 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
             isHovered={hoveredCityName === city.name}
             onHover={setHoveredCityName}
             onClick={() => {
+              const resolved = resolveDestination(city.name);
+              if (resolved && onDestinationSelect) {
+                onDestinationSelect(resolved);
+              }
               const normalizedId = city.name.toLowerCase() === 'tashkent' ? 'uzbekistan' :
-                                   city.name.toLowerCase() === 'new york' ? 'usa' :
-                                   city.name.toLowerCase() === 'dubai' ? 'egypt' :
+                                   city.name.toLowerCase() === 'samarkand' ? 'samarkand' :
+                                   city.name.toLowerCase() === 'cappadocia' ? 'cappadocia' :
                                    city.name.toLowerCase() === 'istanbul' ? 'turkey' :
                                    city.name.toLowerCase() === 'paris' ? 'france' :
                                    city.name.toLowerCase() === 'tokyo' ? 'japan' : 'uzbekistan';
               
               if (onSelectCountry) onSelectCountry(normalizedId);
-              
-              const dbRecord = COUNTRY_DETAILS_DB[normalizedId];
-              if (dbRecord && onCountrySelect) {
-                onCountrySelect(dbRecord);
-              }
             }}
           />
         ))}
 
-        {flightPairs.map((pair, idx) => (
-          <FlightArc
-            key={idx}
-            from={pair.from}
-            to={pair.to}
+        {/* Focused Accurate Destination Marker Pin */}
+        {activeDestination && (
+          <DestinationMarker destination={activeDestination} isFocused={true} />
+        )}
+
+        {/* Geographically Meaningful 3D Curved Flight Arc with Animated Aircraft */}
+        {flightActive && previousDestination && activeDestination && (
+          <FlightPathAnimation
+            origin={{ lat: previousDestination.lat, lng: previousDestination.lng, name: previousDestination.name }}
+            destination={{ lat: activeDestination.lat, lng: activeDestination.lng, name: activeDestination.name }}
+            globeRadius={2.52}
+            durationSeconds={2.6}
+            onArrival={onFlightArrival}
           />
-        ))}
+        )}
       </group>
     </>
   );

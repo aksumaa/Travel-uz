@@ -7,6 +7,7 @@ import {
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { api } from '../services/api';
 
 interface MyTripsViewProps {
@@ -17,6 +18,7 @@ interface MyTripsViewProps {
 export const MyTripsView: React.FC<MyTripsViewProps> = ({ onViewTrip }) => {
   const { t } = useLanguage();
   const { user } = useAuth();
+  const { formatPrice } = useCurrency();
   const [activeSubTab, setActiveSubTab] = useState<'all' | 'upcoming' | 'completed' | 'draft'>('all');
   
   const [trips, setTrips] = useState<any[]>(() => {
@@ -196,7 +198,7 @@ export const MyTripsView: React.FC<MyTripsViewProps> = ({ onViewTrip }) => {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--glass-border)', paddingTop: '12px', marginTop: '8px' }}>
-                <strong style={{ color: '#10b981', fontSize: '1.1rem' }}>${trip.totalCost}</strong>
+                <strong style={{ color: '#10b981', fontSize: '1.1rem' }}>{formatPrice(trip.totalCost)}</strong>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button onClick={() => onViewTrip ? onViewTrip(String(trip.id)) : alert('Inspecting trip map details...')} style={{ padding: '6px', color: 'var(--color-accent)' }} title="View"><Compass size={16} /></button>
                   <button onClick={() => onViewTrip ? onViewTrip(String(trip.id)) : alert('Editing itinerary schedule...')} style={{ padding: '6px', color: 'var(--color-purple)' }} title="Edit"><Edit3 size={16} /></button>
@@ -609,85 +611,235 @@ export const AttractionsView: React.FC = () => {
 };
 
 
-// ==================== SAVED VIEW ====================
+// ==================== SAVED MULTI-ENTITY VAULT ====================
 export const SavedView: React.FC = () => {
-  const [tab, setTab] = useState<'places' | 'trips'>('places');
-  
-  const [places, setPlaces] = useState<string[]>(() => {
-    const saved = localStorage.getItem('travel_uz_saved_places');
-    return saved ? JSON.parse(saved) : ['Registan Square', 'Eiffel Tower View', 'Mount Fuji Trek'];
-  });
+  const { formatPrice } = useCurrency();
+  const [category, setCategory] = useState<'all' | 'trips' | 'tours' | 'hotels' | 'food' | 'attractions'>('all');
+  const [savedDestinationFilter, setSavedDestinationFilter] = useState('All');
 
-  const handleRemove = (name: string) => {
-    const list = places.filter(p => p !== name);
-    setPlaces(list);
-    localStorage.setItem('travel_uz_saved_places', JSON.stringify(list));
+  const [savedItems, setSavedItems] = useState([
+    {
+      id: 's-1',
+      title: 'Registan Ensemble & Sher-Dor',
+      type: 'attractions',
+      location: 'Samarkand, Uzbekistan',
+      rating: 4.9,
+      price: 8,
+      imageUrl: 'https://images.unsplash.com/photo-1587974928442-77dc3e0dba72?auto=format&fit=crop&w=400&q=80',
+      badge: 'UNESCO Heritage'
+    },
+    {
+      id: 's-2',
+      title: 'Marakanda Silk Road 5-Day Tour',
+      type: 'tours',
+      location: 'Samarkand & Bukhara',
+      rating: 4.9,
+      price: 520,
+      imageUrl: 'https://images.unsplash.com/photo-1565026057447-bc90a3dceb87?auto=format&fit=crop&w=400&q=80',
+      badge: '95% Match'
+    },
+    {
+      id: 's-3',
+      title: 'Bibikhanum Folk Chaykhana',
+      type: 'food',
+      location: 'Samarkand Old Town',
+      rating: 4.8,
+      price: 12,
+      imageUrl: 'https://images.unsplash.com/photo-1501555088652-021faa106b9b?auto=format&fit=crop&w=400&q=80',
+      badge: 'Authentic Plov'
+    },
+    {
+      id: 's-4',
+      title: 'Silk Road Heritage Boutique Hotel',
+      type: 'hotels',
+      location: 'Samarkand Historic Center',
+      rating: 4.9,
+      price: 85,
+      imageUrl: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=400&q=80',
+      badge: '4★ Boutique'
+    },
+    {
+      id: 's-5',
+      title: 'Eiffel Tower View Suite',
+      type: 'hotels',
+      location: 'Paris, France',
+      rating: 4.8,
+      price: 240,
+      imageUrl: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=400&q=80',
+      badge: 'Balcony View'
+    }
+  ]);
+
+  const handleRemoveItem = (id: string) => {
+    setSavedItems(prev => prev.filter(i => i.id !== id));
   };
+
+  const filteredItems = savedItems.filter(item => {
+    if (category !== 'all' && item.type !== category) return false;
+    if (savedDestinationFilter !== 'All' && !item.location.toLowerCase().includes(savedDestinationFilter.toLowerCase())) return false;
+    return true;
+  });
 
   return (
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      style={{ textAlign: 'left' }}
+      style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '24px' }}
     >
-      <h2 style={{ fontSize: '1.75rem', fontWeight: 900, marginBottom: '6px', fontFamily: 'var(--font-heading)' }}>
-        Saved Items
-      </h2>
-      <p style={{ color: 'var(--color-text-secondary)', marginBottom: '24px' }}>
-        Your personal library of bookmarked destinations, spots, and scheduled trips.
-      </p>
-
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '12px', marginBottom: '24px' }}>
-        {[
-          { id: 'places', label: 'Saved Coordinates' },
-          { id: 'trips', label: 'Saved Trip Plans' }
-        ].map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id as any)}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '10px',
-              fontWeight: 700,
-              fontSize: '0.85rem',
-              background: tab === t.id ? 'var(--color-accent-glow)' : 'transparent',
-              color: tab === t.id ? 'var(--color-accent)' : 'var(--color-text-muted)'
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+          <Heart size={16} style={{ color: '#ef4444' }} />
+          <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: '#ef4444' }}>
+            Universal Bookmark Vault
+          </span>
+        </div>
+        <h2 style={{ fontSize: '1.8rem', fontWeight: 900, margin: 0, fontFamily: 'var(--font-heading)' }}>
+          Saved Collections
+        </h2>
+        <p style={{ color: 'var(--color-text-secondary)', margin: '4px 0 0 0', fontSize: '0.9rem' }}>
+          Your bookmarked trips, verified agency tours, boutique hotels, restaurants, and cultural sights.
+        </p>
       </div>
 
-      {tab === 'places' ? (
+      {/* 5-Category Tabs & Filter */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '12px' }}>
+        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto' }}>
+          {[
+            { id: 'all', label: `All (${savedItems.length})` },
+            { id: 'trips', label: '🗺️ Trips' },
+            { id: 'tours', label: '🎒 Tours' },
+            { id: 'hotels', label: '🏨 Hotels' },
+            { id: 'food', label: '🍽️ Food' },
+            { id: 'attractions', label: '🏛️ Sights' }
+          ].map(t => (
+            <button
+              key={t.id}
+              onClick={() => setCategory(t.id as any)}
+              style={{
+                padding: '8px 14px',
+                borderRadius: '10px',
+                fontWeight: 700,
+                fontSize: '0.8rem',
+                border: 'none',
+                background: category === t.id ? 'var(--color-accent)' : 'transparent',
+                color: category === t.id ? '#ffffff' : 'var(--color-text-muted)',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Filter by destination */}
+        <div style={{ display: 'flex', gap: '6px' }}>
+          {['All', 'Samarkand', 'Paris'].map(city => (
+            <button
+              key={city}
+              onClick={() => setSavedDestinationFilter(city)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '100px',
+                border: savedDestinationFilter === city ? '1px solid var(--color-accent)' : '1px solid var(--glass-border)',
+                background: savedDestinationFilter === city ? 'rgba(37,99,235,0.15)' : 'var(--color-bg)',
+                color: savedDestinationFilter === city ? '#ffffff' : 'var(--color-text-secondary)',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              {city}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {category === 'trips' ? (
+        <MyTripsView />
+      ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
-          {places.map((place, idx) => (
-            <div key={idx} className="glass-panel" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--color-bg-surface)', border: '1px solid var(--glass-border)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ color: 'var(--color-accent)', background: 'var(--color-bg)', padding: '8px', borderRadius: '10px' }}>
-                  <MapPin size={18} />
-                </div>
-                <strong style={{ fontSize: '0.95rem', color: 'var(--color-text-primary)' }}>{place}</strong>
+          {filteredItems.map((item) => (
+            <div
+              key={item.id}
+              style={{
+                background: 'var(--color-bg-surface)',
+                border: '1px solid var(--glass-border)',
+                borderRadius: '16px',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.2)'
+              }}
+            >
+              <div style={{ height: '140px', position: 'relative' }}>
+                <img src={item.imageUrl} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '10px',
+                    left: '10px',
+                    fontSize: '0.7rem',
+                    fontWeight: 800,
+                    color: '#ffffff',
+                    background: 'rgba(0,0,0,0.65)',
+                    padding: '2px 8px',
+                    borderRadius: '6px'
+                  }}
+                >
+                  {item.badge}
+                </span>
+                <button
+                  onClick={() => handleRemoveItem(item.id)}
+                  style={{
+                    position: 'absolute',
+                    top: '10px',
+                    right: '10px',
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    background: 'rgba(0,0,0,0.6)',
+                    border: 'none',
+                    color: '#ef4444',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer'
+                  }}
+                  title="Remove from saved"
+                >
+                  <Trash2 size={14} />
+                </button>
               </div>
-              <button 
-                onClick={() => handleRemove(place)}
-                style={{ color: '#ef4444', padding: '6px' }}
-                title="Remove"
-              >
-                <Trash2 size={16} />
-              </button>
+
+              <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--color-text-primary)' }}>
+                    {item.title}
+                  </h4>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                    <MapPin size={12} style={{ color: 'var(--color-accent)' }} />
+                    {item.location}
+                  </span>
+                </div>
+
+                <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid var(--glass-border)' }}>
+                  <strong style={{ fontSize: '0.95rem', color: '#10b981' }}>{formatPrice(item.price)}</strong>
+                  <span style={{ fontSize: '0.75rem', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '2px', fontWeight: 800 }}>
+                    <Star size={12} fill="#f59e0b" stroke="none" /> {item.rating}
+                  </span>
+                </div>
+              </div>
             </div>
           ))}
-          {places.length === 0 && (
-            <div style={{ gridColumn: 'span 3', padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-              No saved coordinates found.
+
+          {filteredItems.length === 0 && (
+            <div style={{ gridColumn: 'span 3', padding: '60px 20px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+              <Heart size={32} style={{ opacity: 0.3, margin: '0 auto 12px auto' }} />
+              <p style={{ margin: 0 }}>No saved items found in this category.</p>
             </div>
           )}
         </div>
-      ) : (
-        /* Re-use Trips View filter directly for Saved trips */
-        <MyTripsView />
       )}
     </motion.div>
   );
@@ -698,7 +850,7 @@ export const SavedView: React.FC = () => {
 export const AIAssistantView: React.FC = () => {
   const { t } = useLanguage();
   const [messages, setMessages] = useState<any[]>([
-    { sender: 'assistant', text: 'Hello! I am your TravelUZ co-pilot. I am connected directly to Claude API. How can I guide your journey details today?' }
+    { sender: 'assistant', text: 'Hello! I am your TripMind AI Copilot. How can I guide your journey details today?' }
   ]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -826,30 +978,34 @@ export const AIAssistantView: React.FC = () => {
 
 // ==================== PROFILE VIEW ====================
 export const ProfileView: React.FC = () => {
-  const { t } = useLanguage();
   const { user, updateUser } = useAuth();
+  const { currency, setCurrency, currencies } = useCurrency();
   
-  const [name, setName] = useState(user?.name || 'John Doe');
-  const [email, setEmail] = useState(user?.email || 'john.doe@traveluz.com');
+  const [name, setName] = useState(user?.name || 'Traveler');
+  const [email, setEmail] = useState(user?.email || 'traveler@tripmind.com');
   const [avatar, setAvatar] = useState(user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80');
+  const [dietary, setDietary] = useState('Halal & Traditional');
+  const [preferredPace, setPreferredPace] = useState('Balanced');
+  const [savedSuccess, setSavedSuccess] = useState(false);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     updateUser({ name, email, avatar });
-    alert('Profile data saved successfully.');
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 2500);
   };
 
   return (
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      style={{ textAlign: 'left', maxWidth: '600px', margin: '0 auto' }}
+      style={{ textAlign: 'left', maxWidth: '640px', margin: '0 auto' }}
     >
       <h2 style={{ fontSize: '1.75rem', fontWeight: 900, marginBottom: '6px', fontFamily: 'var(--font-heading)' }}>
-        {t('dashboard.profileTitle')}
+        Traveler Profile & Preferences
       </h2>
       <p style={{ color: 'var(--color-text-secondary)', marginBottom: '32px' }}>
-        {t('dashboard.profileSubtitle')}
+        Manage your profile, preferred currency, dietary preferences, and pacing.
       </p>
 
       <form onSubmit={handleSave} className="glass-panel" style={{ padding: '32px', background: 'var(--color-bg-surface)', border: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -870,7 +1026,7 @@ export const ProfileView: React.FC = () => {
         {/* Input Name */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
-            {t('dashboard.profileName')}
+            Full Name
           </label>
           <input type="text" value={name} onChange={(e) => setName(e.target.value)} style={{ padding: '12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '12px', color: 'var(--color-text-primary)' }} />
         </div>
@@ -878,24 +1034,71 @@ export const ProfileView: React.FC = () => {
         {/* Input Email */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
-            {t('dashboard.profileEmail')}
+            Email Address
           </label>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ padding: '12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '12px', color: 'var(--color-text-primary)' }} />
         </div>
 
-        {/* Subscription */}
-        <div style={{ background: 'var(--color-bg)', padding: '16px', borderRadius: '14px', border: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <strong style={{ fontSize: '0.9rem', color: 'var(--color-text-primary)', display: 'block' }}>Subscription Level</strong>
-            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Premium Elite Member</span>
-          </div>
-          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-accent)', background: 'var(--color-accent-glow)', padding: '6px 12px', borderRadius: '8px' }}>
-            ACTIVE
-          </span>
+        {/* Currency Selector */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+            Preferred Currency Display
+          </label>
+          <select
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value as any)}
+            style={{ padding: '12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '12px', color: 'var(--color-text-primary)' }}
+          >
+            {currencies.map(c => (
+              <option key={c.code} value={c.code}>
+                {c.symbol} {c.code} — {c.name}
+              </option>
+            ))}
+          </select>
         </div>
 
+        {/* Dietary Preference */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+            Dietary Requirements
+          </label>
+          <select
+            value={dietary}
+            onChange={(e) => setDietary(e.target.value)}
+            style={{ padding: '12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '12px', color: 'var(--color-text-primary)' }}
+          >
+            <option value="Halal & Traditional">Halal Certified & Traditional Food</option>
+            <option value="Vegetarian">Vegetarian Friendly</option>
+            <option value="Vegan">Vegan Only</option>
+            <option value="Gluten-Free">Gluten-Free / Celiac</option>
+            <option value="No Restrictions">No Restrictions</option>
+          </select>
+        </div>
+
+        {/* Default Pacing */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+            Default Travel Pacing
+          </label>
+          <select
+            value={preferredPace}
+            onChange={(e) => setPreferredPace(e.target.value)}
+            style={{ padding: '12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '12px', color: 'var(--color-text-primary)' }}
+          >
+            <option value="Relaxed">Relaxed (1-2 places/day, ample leisure)</option>
+            <option value="Balanced">Balanced (3-4 places/day, steady rhythm)</option>
+            <option value="Packed">Packed / Fast-Paced (5+ sights/day, maximum coverage)</option>
+          </select>
+        </div>
+
+        {savedSuccess && (
+          <div style={{ color: '#10b981', fontSize: '0.85rem', fontWeight: 800, textAlign: 'center' }}>
+            ✓ Profile preferences saved successfully!
+          </div>
+        )}
+
         <button type="submit" className="btn-premium" style={{ width: '100%', padding: '12px', border: 'none', marginTop: '10px' }}>
-          Save Profile Details
+          Save Preferences
         </button>
       </form>
     </motion.div>
@@ -1004,7 +1207,7 @@ export const SettingsView: React.FC = () => {
           <button 
             type="button" 
             onClick={() => {
-              if (confirm('Are you absolutely sure you want to delete your TravelUZ account?')) {
+              if (confirm('Are you absolutely sure you want to delete your TripMind account?')) {
                 alert('Account deleted.');
               }
             }} 
