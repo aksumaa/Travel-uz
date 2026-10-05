@@ -29,6 +29,140 @@ interface GlobeProps {
   onSelectedFeature?: (feature: any) => void;
 }
 
+class GlobeErrorBoundary extends React.Component<
+  { fallback: React.ReactNode; children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.warn("Globe 3D WebGL render fallback activated:", error?.message || error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
+}
+
+// Interactive Elegant 2D/SVG Orbital Fallback Globe when WebGL is unavailable
+const FallbackGlobeView: React.FC<{
+  activeDestination: DestinationItem | null;
+  onDestinationSelect: (dest: DestinationItem) => void;
+  autoRotate?: boolean;
+}> = ({ activeDestination, onDestinationSelect, autoRotate = true }) => {
+  return (
+    <div style={{
+      position: 'absolute',
+      inset: 0,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'radial-gradient(circle at 50% 50%, rgba(14, 165, 233, 0.08) 0%, rgba(15, 23, 42, 0) 70%)',
+      pointerEvents: 'auto'
+    }}>
+      <div style={{
+        position: 'relative',
+        width: 'min(380px, 80vw)',
+        height: 'min(380px, 80vw)',
+        borderRadius: '50%',
+        background: 'radial-gradient(circle at 35% 35%, #1e293b 0%, #090d1a 100%)',
+        border: '1px solid rgba(56, 189, 248, 0.25)',
+        boxShadow: '0 0 60px rgba(14, 165, 233, 0.2), inset 0 0 40px rgba(37, 99, 235, 0.3)',
+        overflow: 'hidden',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        {/* Atmosphere Rings */}
+        <div style={{
+          position: 'absolute',
+          inset: '-15%',
+          borderRadius: '50%',
+          border: '1px dashed rgba(56, 189, 248, 0.2)',
+          animation: autoRotate ? 'spin 40s linear infinite' : 'none'
+        }} />
+        <div style={{
+          position: 'absolute',
+          inset: '10%',
+          borderRadius: '50%',
+          border: '1px solid rgba(255, 255, 255, 0.05)'
+        }} />
+        <div style={{
+          position: 'absolute',
+          width: '100%',
+          height: '1px',
+          background: 'linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.4), transparent)'
+        }} />
+        <div style={{
+          position: 'absolute',
+          height: '100%',
+          width: '1px',
+          background: 'linear-gradient(180deg, transparent, rgba(56, 189, 248, 0.4), transparent)'
+        }} />
+
+        {/* Global Key Hub Nodes */}
+        {DESTINATIONS_CATALOG.slice(0, 6).map((dest, idx) => {
+          const angle = (idx / 6) * 2 * Math.PI - Math.PI / 2;
+          const radiusPercent = 34; // from center
+          const x = 50 + radiusPercent * Math.cos(angle);
+          const y = 50 + radiusPercent * Math.sin(angle);
+          const isSelected = activeDestination?.id === dest.id;
+
+          return (
+            <button
+              key={dest.id}
+              onClick={() => onDestinationSelect(dest)}
+              style={{
+                position: 'absolute',
+                left: `${x}%`,
+                top: `${y}%`,
+                transform: 'translate(-50%, -50%)',
+                background: isSelected ? '#38bdf8' : 'rgba(15, 23, 42, 0.85)',
+                border: isSelected ? '2px solid #ffffff' : '1px solid rgba(56, 189, 248, 0.4)',
+                borderRadius: '100px',
+                padding: '4px 8px',
+                color: isSelected ? '#090d1a' : '#ffffff',
+                fontSize: '0.68rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                zIndex: 10,
+                boxShadow: isSelected ? '0 0 15px #38bdf8' : '0 2px 8px rgba(0,0,0,0.5)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <span>{dest.flag}</span>
+              <span>{dest.name}</span>
+            </button>
+          );
+        })}
+
+        {/* Center telemetry */}
+        <div style={{ textAlign: 'center', zIndex: 5, padding: '12px', pointerEvents: 'none' }}>
+          <div style={{ fontSize: '0.62rem', color: '#38bdf8', fontWeight: 800, letterSpacing: '1px', textTransform: 'uppercase' }}>
+            Interactive Telemetry
+          </div>
+          <div style={{ fontSize: '0.9rem', color: '#ffffff', fontWeight: 800 }}>
+            {activeDestination?.name || 'Silk Road Hub'}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const Globe3D: React.FC<GlobeProps> = ({
   onCountrySelect,
   onDestinationSelect,
@@ -46,6 +180,12 @@ export const Globe3D: React.FC<GlobeProps> = ({
 
   useEffect(() => {
     setIsMounted(true);
+    if (typeof window !== 'undefined') {
+      const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+      if (mediaQuery.matches) {
+        setAutoRotate(false);
+      }
+    }
   }, []);
 
   // Destination and flight states
@@ -328,47 +468,62 @@ export const Globe3D: React.FC<GlobeProps> = ({
         </div>
       )}
 
-      {/* THREE.JS WEBGL CANVAS */}
-      {isMounted && (
-        <Canvas
-          camera={{ position: [0, 0, 5.8], fov: 45 }}
-          gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
-          dpr={isMobile ? 1 : Math.min(window.devicePixelRatio, 1.5)}
-          style={{ background: 'transparent', outline: 'none' }}
-        >
-          <Suspense fallback={null}>
-            <GlobeScene
-              activeSelectedId={activeDestination?.id || selectedCountry || selectedCountryId || null}
+      {/* THREE.JS WEBGL CANVAS WITH CRASH-RESISTANT ERROR BOUNDARY */}
+      {isMounted ? (
+        <GlobeErrorBoundary
+          fallback={
+            <FallbackGlobeView
               activeDestination={activeDestination}
-              previousDestination={previousDestination}
-              flightActive={flightActive}
-              selectedCountryFeature={selectedCountryFeature}
-              hoveredCountryFeature={hoveredCountryFeature}
-              onHoverCountryFeatureChange={setHoveredCountryFeature}
-              onSelectCountryFeatureChange={setSelectedCountryFeature}
-              onCountrySelect={onCountrySelect}
-              onDestinationSelect={(dest) => {
-                if (activeDestination?.id !== dest.id) {
-                  setPreviousDestination(activeDestination);
-                  setFlightActive(true);
-                  setActiveDestination(dest);
-                }
-                if (onDestinationSelect) onDestinationSelect(dest);
-              }}
-              onSelectCountry={onSelectCountry}
-              onFlightArrival={() => {
-                // Smoothly mark flight arrival
-                setFlightActive(false);
-              }}
+              onDestinationSelect={handleDestinationTransition}
               autoRotate={autoRotate}
-              setAutoRotate={setAutoRotate}
-              zoomLevel={zoomLevel}
             />
-          </Suspense>
-        </Canvas>
+          }
+        >
+          <Canvas
+            camera={{ position: [0, 0, 5.8], fov: 45 }}
+            gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
+            dpr={isMobile ? 1 : Math.min(window.devicePixelRatio, 1.5)}
+            style={{ background: 'transparent', outline: 'none' }}
+          >
+            <Suspense fallback={null}>
+              <GlobeScene
+                activeSelectedId={activeDestination?.id || selectedCountry || selectedCountryId || null}
+                activeDestination={activeDestination}
+                previousDestination={previousDestination}
+                flightActive={flightActive}
+                selectedCountryFeature={selectedCountryFeature}
+                hoveredCountryFeature={hoveredCountryFeature}
+                onHoverCountryFeatureChange={setHoveredCountryFeature}
+                onSelectCountryFeatureChange={setSelectedCountryFeature}
+                onCountrySelect={onCountrySelect}
+                onDestinationSelect={(dest) => {
+                  if (activeDestination?.id !== dest.id) {
+                    setPreviousDestination(activeDestination);
+                    setFlightActive(true);
+                    setActiveDestination(dest);
+                  }
+                  if (onDestinationSelect) onDestinationSelect(dest);
+                }}
+                onSelectCountry={onSelectCountry}
+                onFlightArrival={() => {
+                  setFlightActive(false);
+                }}
+                autoRotate={autoRotate}
+                setAutoRotate={setAutoRotate}
+                zoomLevel={zoomLevel}
+              />
+            </Suspense>
+          </Canvas>
+        </GlobeErrorBoundary>
+      ) : (
+        <FallbackGlobeView
+          activeDestination={activeDestination}
+          onDestinationSelect={handleDestinationTransition}
+          autoRotate={false}
+        />
       )}
 
-      {/* Top-Left Target Crosshair Button (Reference 3) */}
+      {/* Top-Left Target Crosshair Button */}
       <div style={{ position: 'absolute', top: '20px', left: '20px', zIndex: 110 }}>
         <button
           onClick={() => {
@@ -394,7 +549,7 @@ export const Globe3D: React.FC<GlobeProps> = ({
         </button>
       </div>
 
-      {/* Top-Right Globe Controls (+, -, Recenter) (Reference 3) */}
+      {/* Top-Right Globe Controls (+, -, Recenter) */}
       <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 110, display: 'flex', flexDirection: 'column', gap: '6px' }}>
         <button
           onClick={() => setZoomLevel(prev => Math.min(prev * 1.25, 2.2))}
@@ -458,7 +613,7 @@ export const Globe3D: React.FC<GlobeProps> = ({
         </button>
       </div>
 
-      {/* Bottom-Left Photo Carousel Preview Overlay (Reference 3) */}
+      {/* Bottom-Left Photo Carousel Preview Overlay */}
       {activeDestination?.popularDestinations && activeDestination.popularDestinations.length > 0 && (
         <div style={{
           position: 'absolute',

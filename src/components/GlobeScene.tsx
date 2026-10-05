@@ -445,17 +445,30 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
     }
   }, [zoomLevel, camera]);
 
-  // Load Boundaries GeoJSON
+  // Load Boundaries GeoJSON with resilient error catching
   useEffect(() => {
+    let isMounted = true;
     fetch('/countries.json')
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP error ${r.status}`);
+        return r.json();
+      })
       .then((data) => {
+        if (!isMounted || !data?.features) return;
         data.features.forEach((feature: any) => {
           feature.bbox = calculateBBox(feature.geometry);
         });
         setGeoJsonData(data);
       })
-      .catch((err) => console.error("Error loading boundaries GeoJSON in Scene:", err));
+      .catch((err) => {
+        if (isMounted) {
+          console.warn("Notice: GeoJSON boundaries fallback enabled:", err?.message || err);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Smooth camera/globe rotation whenever active destination or selected country changes

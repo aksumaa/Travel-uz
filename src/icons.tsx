@@ -1,3 +1,5 @@
+'use client';
+
 import type { CSSProperties, SVGProps } from 'react';
 import {
   Activity as ActivityIcon,
@@ -171,8 +173,12 @@ export const ZoomOut = ix(SearchNormal1);
 export const Edit2 = ix(Edit2Icon);
 export const Flag = ix(TagIcon);
 export const BarChart3 = ix(TrendUp);
-export const XCircle = ix(CloseCircle);
 export const Phone = ix(Sms);
+export const XCircle = ix(CloseCircle);
+export const Copy = ix(Save2);
+export const Upload = ix(DocumentDownload);
+export const ExternalLink = ix(ExportSquare);
+export const Image = ix(DocumentText);
 
 
 
