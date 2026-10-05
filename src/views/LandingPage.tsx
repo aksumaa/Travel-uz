@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, useInView } from 'framer-motion';
 import { Globe3D } from '../components/Globe3D';
 import { useLanguage } from '../context/LanguageContext';
@@ -8,7 +9,7 @@ import {
   Sparkles, Star, Users,
   Compass, Globe, Lock, Languages,
   MessageSquare, Hotel, Tag
-} from 'lucide-react';
+} from '../icons';
 
 interface LandingPageProps {
   onStartPlanning: (countryId: string, initialView?: string) => void;
@@ -96,6 +97,7 @@ const getTranslation = (key: string, lang: string) => {
 export const LandingPage: React.FC<LandingPageProps> = ({ onStartPlanning }) => {
   const { t, language } = useLanguage();
   const { setShowAuthModal, user } = useAuth();
+  const router = useRouter();
   
   // Tab switcher in Search Bar
   const [activeTab, setActiveTab] = useState<'flights' | 'hotels' | 'restaurants'>('flights');
@@ -128,13 +130,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartPlanning }) => 
   const [aiBudget, setAiBudget] = useState(1500);
   const [aiTravelers, setAiTravelers] = useState(2);
   const [aiStyle, setAiStyle] = useState('Adventure');
+  const [selectedCountry, setSelectedCountry] = useState('uzbekistan');
 
   // Helper to handle authenticated clicks
   const handleAuthGate = (destinationView: string) => {
+    localStorage.setItem('auth_redirect_view', destinationView);
     if (user) {
       onStartPlanning('uzbekistan', destinationView);
+      router.push('/dashboard');
     } else {
-      localStorage.setItem('auth_redirect_view', destinationView);
+      localStorage.setItem('auth_redirect_path', '/dashboard');
       setShowAuthModal(true);
     }
   };
@@ -239,10 +244,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartPlanning }) => 
           overflow: 'hidden'
         }}>
           <Globe3D 
-            selectedCountryId="uzbekistan"
+            selectedCountry={selectedCountry}
             showSearchBar={true}
             onSelectCountry={(id) => {
-              // Country selected on globe
+              setSelectedCountry(id);
             }}
             onCreateTrip={(dest) => {
               handleAuthGate('planner');

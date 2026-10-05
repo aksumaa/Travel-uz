@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Navigation, ZoomIn, ZoomOut, Compass, Shield, Sparkles } from 'lucide-react';
+import { MapPin, Navigation, ZoomIn, ZoomOut, Compass, Shield, Sparkles } from '../icons';
 import { useCurrency } from '../context/CurrencyContext';
 
 declare global {
@@ -53,7 +53,7 @@ export const TripMap: React.FC<TripMapProps> = ({
     lng: locations.find((l) => l.lat && l.lng)?.lng || 66.9597,
   };
 
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  const apiKey = (typeof process !== 'undefined' && (process.env?.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || process.env?.VITE_GOOGLE_MAPS_API_KEY)) || '';
 
   // Check if Google Maps is available
   useEffect(() => {

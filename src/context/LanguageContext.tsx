@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { translations } from '../locales/translations';
 import type { Language } from '../locales/translations';
 
@@ -11,24 +11,28 @@ interface LanguageContextProps {
 const LanguageContext = createContext<LanguageContextProps | undefined>(undefined);
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [language, setLanguageState] = useState<Language>(() => {
-    const saved = localStorage.getItem('traveluz-lang');
-    if (saved === 'uz' || saved === 'ru' || saved === 'en') {
-      return saved as Language;
-    }
-    // Handle uppercase legacy settings if present
-    if (saved === 'UZ') return 'uz';
-    if (saved === 'RU') return 'ru';
-    if (saved === 'EN') return 'en';
-    
-    // Detect browser language or fallback to 'uz'
-    const systemLang = navigator.language.split('-')[0].toLowerCase();
-    if (systemLang === 'ru') return 'ru';
-    if (systemLang === 'en') return 'en';
-    return 'uz';
-  });
+  const [language, setLanguageState] = useState<Language>('uz');
+  const hydrated = useRef(false);
 
   useEffect(() => {
+    if (!hydrated.current) {
+      hydrated.current = true;
+      const saved = localStorage.getItem('traveluz-lang');
+      let next: Language = 'uz';
+      if (saved === 'uz' || saved === 'ru' || saved === 'en') next = saved;
+      else if (saved === 'UZ') next = 'uz';
+      else if (saved === 'RU') next = 'ru';
+      else if (saved === 'EN') next = 'en';
+      else {
+        const systemLang = navigator.language.split('-')[0].toLowerCase();
+        if (systemLang === 'ru') next = 'ru';
+        else if (systemLang === 'en') next = 'en';
+      }
+      if (next !== language) {
+        setLanguageState(next);
+        return;
+      }
+    }
     localStorage.setItem('traveluz-lang', language);
   }, [language]);
 

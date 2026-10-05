@@ -3,12 +3,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft, Calendar, User, Compass, Download, Plus, 
   Trash2, Edit3, MapPin, Star, AlertTriangle, CloudRain, 
-  Wind, Thermometer, Check, X, FileText, CheckCircle2, 
-  RefreshCw, Shield, Sparkles, Coffee, Utensils, Hotel, 
-  Car, ShoppingBag, Music, Navigation, Share2, Layers, 
-  Zap, Clock, DollarSign, ChevronRight, Landmark 
-} from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
+  Wind, Thermometer, Check, X, FileText, Shield, 
+  Coffee, Utensils, Hotel, 
+  Car, ShoppingBag, Music, Navigation, Share2, 
+  Zap, DollarSign, Landmark 
+} from '../icons';
 import { useCurrency } from '../context/CurrencyContext';
 import { api } from '../services/api';
 import { TripMap, type MapPoint } from '../components/TripMap';
@@ -136,6 +135,7 @@ export const TripDetailsView: React.FC<TripDetailsViewProps> = ({ tripId, onBack
       }
     }
   }, [tripId]);
+
 
   if (!trip) {
     return (
@@ -296,8 +296,17 @@ export const TripDetailsView: React.FC<TripDetailsViewProps> = ({ tripId, onBack
 
   // PDF Export
   const handleDownloadPdf = () => {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
-    window.open(`${baseUrl}/trips/${trip.id}/pdf`, '_blank');
+    window.print();
+  };
+
+  const handleExportJson = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(trip.rawTripData, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `${(trip.destination || 'trip').replace(/[\s,]+/g, '_')}_itinerary.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
   };
 
   // Share Public Link
@@ -474,6 +483,15 @@ export const TripDetailsView: React.FC<TripDetailsViewProps> = ({ tripId, onBack
           >
             <Download size={14} />
             <span>Export PDF</span>
+          </button>
+
+          <button
+            onClick={handleExportJson}
+            className="btn-secondary"
+            style={{ padding: '8px 14px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <FileText size={14} />
+            <span>Export JSON</span>
           </button>
 
           <button

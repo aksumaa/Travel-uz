@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 
 export type CurrencyCode = 'USD' | 'EUR' | 'UZS' | 'GBP' | 'JPY';
 
@@ -60,15 +60,18 @@ interface CurrencyContextType {
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
 
 export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currency, setCurrencyState] = useState<CurrencyCode>(() => {
-    const saved = localStorage.getItem('tripmind_currency');
-    if (saved && saved in CURRENCIES) {
-      return saved as CurrencyCode;
-    }
-    return 'USD';
-  });
+  const [currency, setCurrencyState] = useState<CurrencyCode>('USD');
+  const hydrated = useRef(false);
 
   useEffect(() => {
+    if (!hydrated.current) {
+      hydrated.current = true;
+      const saved = localStorage.getItem('tripmind_currency');
+      if (saved && saved in CURRENCIES) {
+        setCurrencyState(saved as CurrencyCode);
+        return;
+      }
+    }
     localStorage.setItem('tripmind_currency', currency);
   }, [currency]);
 
@@ -99,7 +102,7 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         formatPrice,
         convertPrice,
         currencies: Object.values(CURRENCIES),
-        currentConfig: CURRENCIES[currency],
+        currentConfig: CURRENCIES[currency] || CURRENCIES.USD,
       }}
     >
       {children}

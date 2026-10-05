@@ -4,9 +4,9 @@ import {
   X, Heart, CloudSun, Sun, CloudRain, Cloud, Sparkles, 
   MapPin, Globe, Languages, DollarSign, Clock, ShieldCheck, 
   Building2, Utensils, Compass, Star, ChevronRight, ArrowRight 
-} from 'lucide-react';
+} from '../icons';
 import { useTranslation } from '../context/LanguageContext';
-import { type DestinationItem, resolveDestination } from '../services/destinationCatalog';
+import { type DestinationItem, resolveDestination, generateDestinationForCountry } from '../services/destinationCatalog';
 
 export interface CountryData {
   name: string;
@@ -40,13 +40,15 @@ interface CountryInfoPanelProps {
   onClose?: () => void;
   onCreateTrip?: (destination: any) => void;
   inline?: boolean;
+  embedded?: boolean;
 }
 
 export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({ 
   country, 
   onClose, 
-  onCreateTrip,
-  inline = false 
+  onCreateTrip, 
+  inline = false,
+  embedded = false 
 }) => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'overview' | 'places' | 'hotels' | 'food' | 'tours'>('overview');
@@ -58,28 +60,36 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({
   let item: DestinationItem | null = null;
   let countryName = '';
 
-  if ((country as any).id && (country as any).places) {
+  if ((country as any).places && (country as any).countryCode) {
     item = country as DestinationItem;
     countryName = item.country;
   } else if ((country as any).properties?.NAME) {
     countryName = (country as any).properties.NAME;
-    item = resolveDestination(countryName);
+    item = resolveDestination(countryName, (country as any).properties);
   } else if ((country as any).name) {
     countryName = (country as any).name;
     item = resolveDestination(countryName);
+  } else if ((country as any).id) {
+    countryName = (country as any).id;
+    item = resolveDestination(countryName);
   }
 
-  // Fallback metadata if not in detailed catalog
+  if (!item && countryName) {
+    item = generateDestinationForCountry(countryName);
+  }
+
+  // Fallback metadata
   const name = item ? item.name : countryName || 'Destination';
-  const capital = item?.capital || (country as any)?.capital || 'Capital City';
+  const capital = item?.capital || (country as any)?.capital || `${name} Capital`;
   const currency = item?.currency || (country as any)?.currency || 'USD';
+  const currencySymbol = item?.currencySymbol || '$';
   const language = item?.language || (country as any)?.language || 'Local Language';
   const timezone = item?.timezone || (country as any)?.timezone || 'GMT+0';
   const flag = item?.flag || (country as any)?.flag || '🌍';
-  const description = item?.description || (country as any)?.description || `${name} is a magnificent Silk Road jewel known for its historical cities and hospitality.`;
-  const weather = item?.weather ? { temp: item.weather.tempC, condition: item.weather.condition } : (country as any)?.weather || { temp: 23, condition: 'Sunny' };
-  const bestSeason = item?.bestSeason || (country as any)?.bestTime || 'Mar – May, Sep – Nov';
-  const visaVerified = item?.visaVerified || { status: 'Visa Free', summary: 'Visa-free entry for up to 30 days for 85+ countries.' };
+  const description = item?.description || (country as any)?.description || `Discover the cultural heritage, remarkable sights, and authentic travel experiences of ${name}.`;
+  const weather = item?.weather ? { temp: item.weather.tempC, condition: item.weather.condition } : (country as any)?.weather || { temp: 24, condition: 'Sunny' };
+  const bestSeason = item?.bestSeason || (country as any)?.bestTime || 'Spring & Autumn';
+  const visaVerified = item?.visaVerified || { status: 'Visa Free', summary: `Standard travel entry for visiting ${name}.` };
   const places = item?.places || [];
   const hotels = item?.hotels || [];
   const restaurants = item?.restaurants || [];
@@ -89,7 +99,7 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({
   // Hero Cover Image
   const heroImage = item?.popularDestinations?.[0]?.image || 
                     item?.places?.[0]?.imageUrl || 
-                    'https://images.unsplash.com/photo-1587974928442-77dc3e0dba72?auto=format&fit=crop&w=800&q=80';
+                    'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=800&q=80';
 
   const getWeatherIcon = (condition?: string) => {
     if (!condition) return <CloudSun size={16} style={{ color: '#f59e0b' }} />;
@@ -106,6 +116,8 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({
     }
   };
 
+  const isInline = inline || embedded;
+
   const panelContent = (
     <div style={{
       display: 'flex',
@@ -114,11 +126,11 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({
       width: '100%',
       background: 'var(--color-bg-surface, #ffffff)',
       color: 'var(--color-text-primary, #0f172a)',
-      borderRadius: inline ? '20px' : '0',
+      borderRadius: isInline ? '20px' : '0',
       overflow: 'hidden',
       position: 'relative'
     }}>
-      {/* 1. HERO PHOTO HEADER (Reference 3 visual alignment) */}
+      {/* 1. HERO PHOTO HEADER */}
       <div style={{
         position: 'relative',
         height: '175px',
@@ -135,20 +147,19 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({
             objectFit: 'cover'
           }}
         />
-        {/* Subtle Dark Gradient Overlay */}
+        {/* Dark Gradient Overlay */}
         <div style={{
           position: 'absolute',
           inset: 0,
-          background: 'linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.65) 100%)'
+          background: 'linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.72) 100%)'
         }} />
 
-        {/* Top-Right Action Buttons: Favorite & Close / Share */}
+        {/* Top-Right Action Buttons: Favorite & Close */}
         <div style={{
           position: 'absolute',
-          top: '14px',
-          right: '14px',
+          top: '12px',
+          right: '12px',
           display: 'flex',
-          alignItems: 'center',
           gap: '8px',
           zIndex: 10
         }}>
@@ -158,91 +169,113 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({
               width: '32px',
               height: '32px',
               borderRadius: '50%',
-              background: 'rgba(255, 255, 255, 0.85)',
+              background: 'rgba(15, 23, 42, 0.65)',
               backdropFilter: 'blur(8px)',
-              border: 'none',
-              color: isSaved ? '#ef4444' : '#475569',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              color: isSaved ? '#ef4444' : '#ffffff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+              transition: 'all 0.2s'
             }}
-            aria-label="Save Destination"
+            title={isSaved ? 'Saved to Favorites' : 'Save Destination'}
           >
-            <Heart size={15} fill={isSaved ? '#ef4444' : 'none'} stroke={isSaved ? 'none' : 'currentColor'} />
+            <Heart size={15} fill={isSaved ? '#ef4444' : 'none'} />
           </button>
-          
-          {onClose && (
+
+          {!isInline && onClose && (
             <button
               onClick={onClose}
               style={{
                 width: '32px',
                 height: '32px',
                 borderRadius: '50%',
-                background: 'rgba(255, 255, 255, 0.85)',
+                background: 'rgba(15, 23, 42, 0.65)',
                 backdropFilter: 'blur(8px)',
-                border: 'none',
-                color: '#475569',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                color: '#ffffff',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                transition: 'all 0.2s'
               }}
-              aria-label="Close"
+              title="Close panel"
             >
               <X size={15} />
             </button>
           )}
         </div>
 
-        {/* Bottom Destination Identification Badge */}
+        {/* Hero Title & Flag Badge */}
         <div style={{
           position: 'absolute',
-          bottom: '14px',
+          bottom: '12px',
           left: '16px',
           right: '16px',
-          zIndex: 10,
           display: 'flex',
-          alignItems: 'center',
-          gap: '10px'
+          justifyContent: 'space-between',
+          alignItems: 'flex-end',
+          zIndex: 5
         }}>
-          <span style={{ fontSize: '1.8rem', lineHeight: 1 }}>{flag}</span>
           <div>
-            <h3 style={{
-              margin: 0,
-              fontSize: '1.35rem',
-              fontWeight: 900,
-              color: '#ffffff',
-              fontFamily: 'var(--font-heading)',
-              textShadow: '0 2px 8px rgba(0,0,0,0.4)'
-            }}>
-              {name}
-            </h3>
-            <span style={{
-              fontSize: '0.72rem',
-              fontWeight: 700,
-              color: 'rgba(255, 255, 255, 0.9)',
-              letterSpacing: '0.4px',
-              textTransform: 'uppercase'
-            }}>
-              {countryName && countryName !== name ? `${countryName} • Central Asia` : 'Central Asia'}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '1.4rem' }}>{flag}</span>
+              <h2 style={{
+                fontSize: '1.45rem',
+                fontWeight: 900,
+                color: '#ffffff',
+                margin: 0,
+                fontFamily: "'Outfit', sans-serif",
+                lineHeight: 1.15
+              }}>
+                {name}
+              </h2>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
+              <MapPin size={11} style={{ color: '#38bdf8' }} />
+              <span style={{ fontSize: '0.72rem', color: '#e2e8f0', fontWeight: 600 }}>
+                {capital} • {currency} ({currencySymbol}) • {language.split(',')[0]}
+              </span>
+            </div>
           </div>
+
+          <button
+            onClick={handleStartPlanning}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '100px',
+              background: '#2563eb',
+              color: '#ffffff',
+              border: 'none',
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              boxShadow: '0 2px 10px rgba(37,99,235,0.4)',
+              flexShrink: 0
+            }}
+          >
+            <Sparkles size={12} />
+            <span>AI Plan</span>
+          </button>
         </div>
       </div>
 
-      {/* 2. TAB NAVIGATION (Overview, Places, Tours, Hotels, Food) */}
+      {/* 2. TAB NAVIGATION BAR */}
       <div style={{
-        padding: '10px 16px',
         display: 'flex',
-        gap: '6px',
-        borderBottom: '1px solid var(--glass-border, rgba(15,23,42,0.08))',
+        borderBottom: '1px solid var(--border, rgba(15, 23, 42, 0.08))',
         background: 'var(--color-bg-surface, #ffffff)',
+        padding: '6px 12px',
+        gap: '4px',
+        overflowX: 'auto',
         flexShrink: 0
       }}>
-        {(['overview', 'places', 'tours', 'hotels', 'food'] as const).map(tab => {
+        {(['overview', 'places', 'hotels', 'food', 'tours'] as const).map(tab => {
           const isActive = activeTab === tab;
           return (
             <button
@@ -282,9 +315,9 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({
             {/* Description Paragraph */}
             <p style={{
               margin: 0,
-              fontSize: '0.8rem',
+              fontSize: '0.82rem',
               color: 'var(--color-text-secondary, #475569)',
-              lineHeight: 1.5,
+              lineHeight: 1.55,
               fontWeight: 500
             }}>
               {description}
@@ -309,11 +342,11 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                   {getWeatherIcon(weather?.condition)}
                   <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--color-text-primary, #0f172a)' }}>
-                    {weather?.temp || 23}°C
+                    {weather?.temp || 24}°C
                   </span>
                 </div>
                 <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted, #64748b)' }}>
-                  Current weather
+                  {weather?.condition || 'Current'}
                 </span>
               </div>
 
@@ -329,12 +362,12 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <Compass size={14} style={{ color: '#2563eb' }} />
-                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--color-text-primary, #0f172a)' }}>
-                    Mar – May
+                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--color-text-primary, #0f172a)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {bestSeason.split('(')[0].trim()}
                   </span>
                 </div>
                 <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted, #64748b)' }}>
-                  Best season
+                  Best Season
                 </span>
               </div>
 
@@ -350,21 +383,21 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <ShieldCheck size={14} style={{ color: '#10b981' }} />
-                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#10b981' }}>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#10b981', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {visaVerified?.status || 'Visa Free'}
                   </span>
                 </div>
                 <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted, #64748b)' }}>
-                  For many countries
+                  Entry status
                 </span>
               </div>
             </div>
 
-            {/* Popular Destinations Mini Cards (Samarkand, Bukhara, Khiva) */}
+            {/* Popular Destinations Mini Cards */}
             {popularDestinations.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted, #64748b)', textTransform: 'uppercase' }}>
-                  Popular Destinations
+                  Popular Highlights in {name}
                 </span>
                 <div style={{
                   display: 'grid',
@@ -378,7 +411,7 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({
                         borderRadius: '12px',
                         overflow: 'hidden',
                         position: 'relative',
-                        height: '75px',
+                        height: '80px',
                         cursor: 'pointer',
                         boxShadow: '0 2px 6px rgba(0,0,0,0.08)'
                       }}
@@ -392,7 +425,7 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({
                       <div style={{
                         position: 'absolute',
                         inset: 0,
-                        background: 'linear-gradient(180deg, transparent 20%, rgba(0,0,0,0.75) 100%)',
+                        background: 'linear-gradient(180deg, transparent 20%, rgba(0,0,0,0.8) 100%)',
                         display: 'flex',
                         flexDirection: 'column',
                         justifyContent: 'flex-end',
@@ -401,8 +434,8 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({
                         <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ffffff', lineHeight: 1.1 }}>
                           {dest.name}
                         </span>
-                        <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.75)' }}>
-                          {i === 0 ? 'Historic cities' : i === 1 ? 'Ancient architecture' : 'Open-air museum'}
+                        <span style={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.8)' }}>
+                          {dest.region || 'Top Destination'}
                         </span>
                       </div>
                     </div>
@@ -416,133 +449,157 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({
         {/* TAB 2: PLACES */}
         {activeTab === 'places' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {places.map((place, idx) => (
-              <div
-                key={idx}
-                style={{
-                  background: 'var(--bg-secondary, #f8fafc)',
-                  border: '1px solid var(--border, rgba(15,23,42,0.08))',
-                  borderRadius: '12px',
-                  padding: '10px 12px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}
-              >
-                <div>
-                  <strong style={{ fontSize: '0.85rem', color: 'var(--color-text-primary, #0f172a)', display: 'block' }}>
-                    {place.name}
-                  </strong>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted, #64748b)' }}>
-                    {place.category} • {place.entryFeeUSD === 0 ? 'Free Entry' : `$${place.entryFeeUSD}`}
+            {places.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-muted)' }}>
+                No places listed for {name}
+              </div>
+            ) : (
+              places.map((place, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    background: 'var(--bg-secondary, #f8fafc)',
+                    border: '1px solid var(--border, rgba(15,23,42,0.08))',
+                    borderRadius: '12px',
+                    padding: '10px 12px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}
+                >
+                  <div>
+                    <strong style={{ fontSize: '0.85rem', color: 'var(--color-text-primary, #0f172a)', display: 'block' }}>
+                      {place.name}
+                    </strong>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted, #64748b)' }}>
+                      {place.category} • {place.entryFeeUSD === 0 ? 'Free Entry' : `$${place.entryFeeUSD}`}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '2px' }}>
+                    <Star size={11} fill="#f59e0b" stroke="none" /> {place.rating}
                   </span>
                 </div>
-                <span style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '2px' }}>
-                  <Star size={11} fill="#f59e0b" stroke="none" /> {place.rating}
-                </span>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         )}
 
         {/* TAB 3: TOURS */}
         {activeTab === 'tours' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {tours.map((tour, idx) => (
-              <div
-                key={idx}
-                style={{
-                  background: 'var(--bg-secondary, #f8fafc)',
-                  border: '1px solid var(--border, rgba(15,23,42,0.08))',
-                  borderRadius: '12px',
-                  padding: '10px 12px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}
-              >
-                <div>
-                  <strong style={{ fontSize: '0.82rem', color: 'var(--color-text-primary, #0f172a)', display: 'block' }}>
-                    {tour.title}
-                  </strong>
-                  <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted, #64748b)' }}>
-                    {tour.agencyName} • {tour.durationDays} Days
-                  </span>
-                </div>
-                <strong style={{ fontSize: '0.9rem', color: '#10b981' }}>
-                  ${tour.priceUSD}
-                </strong>
+            {tours.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-muted)' }}>
+                No ready tours listed for {name}
               </div>
-            ))}
+            ) : (
+              tours.map((tour, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    background: 'var(--bg-secondary, #f8fafc)',
+                    border: '1px solid var(--border, rgba(15,23,42,0.08))',
+                    borderRadius: '12px',
+                    padding: '10px 12px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}
+                >
+                  <div>
+                    <strong style={{ fontSize: '0.82rem', color: 'var(--color-text-primary, #0f172a)', display: 'block' }}>
+                      {tour.title}
+                    </strong>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted, #64748b)' }}>
+                      {tour.agencyName} • {tour.durationDays} Days
+                    </span>
+                  </div>
+                  <strong style={{ fontSize: '0.9rem', color: '#10b981' }}>
+                    ${tour.priceUSD}
+                  </strong>
+                </div>
+              ))
+            )}
           </div>
         )}
 
         {/* TAB 4: HOTELS */}
         {activeTab === 'hotels' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {hotels.map((hotel, idx) => (
-              <div
-                key={idx}
-                style={{
-                  background: 'var(--bg-secondary, #f8fafc)',
-                  border: '1px solid var(--border, rgba(15,23,42,0.08))',
-                  borderRadius: '12px',
-                  padding: '10px 12px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}
-              >
-                <div>
-                  <strong style={{ fontSize: '0.85rem', color: 'var(--color-text-primary, #0f172a)', display: 'block' }}>
-                    {hotel.name}
-                  </strong>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted, #64748b)' }}>
-                    {hotel.type} • {hotel.stars}★
-                  </span>
-                </div>
-                <strong style={{ fontSize: '0.88rem', color: '#10b981' }}>
-                  ${hotel.pricePerNightUSD}/night
-                </strong>
+            {hotels.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-muted)' }}>
+                No hotel listings found for {name}
               </div>
-            ))}
+            ) : (
+              hotels.map((hotel, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    background: 'var(--bg-secondary, #f8fafc)',
+                    border: '1px solid var(--border, rgba(15,23,42,0.08))',
+                    borderRadius: '12px',
+                    padding: '10px 12px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}
+                >
+                  <div>
+                    <strong style={{ fontSize: '0.85rem', color: 'var(--color-text-primary, #0f172a)', display: 'block' }}>
+                      {hotel.name}
+                    </strong>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted, #64748b)' }}>
+                      {hotel.type} • {hotel.stars}★
+                    </span>
+                  </div>
+                  <strong style={{ fontSize: '0.88rem', color: '#10b981' }}>
+                    ${hotel.pricePerNightUSD}/night
+                  </strong>
+                </div>
+              ))
+            )}
           </div>
         )}
 
         {/* TAB 5: FOOD */}
         {activeTab === 'food' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {restaurants.map((rest, idx) => (
-              <div
-                key={idx}
-                style={{
-                  background: 'var(--bg-secondary, #f8fafc)',
-                  border: '1px solid var(--border, rgba(15,23,42,0.08))',
-                  borderRadius: '12px',
-                  padding: '10px 12px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}
-              >
-                <div>
-                  <strong style={{ fontSize: '0.85rem', color: 'var(--color-text-primary, #0f172a)', display: 'block' }}>
-                    {rest.name}
-                  </strong>
-                  <span style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 600 }}>
-                    Specialty: {rest.specialty}
+            {restaurants.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-muted)' }}>
+                No culinary recommendations listed for {name}
+              </div>
+            ) : (
+              restaurants.map((rest, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    background: 'var(--bg-secondary, #f8fafc)',
+                    border: '1px solid var(--border, rgba(15,23,42,0.08))',
+                    borderRadius: '12px',
+                    padding: '10px 12px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}
+                >
+                  <div>
+                    <strong style={{ fontSize: '0.85rem', color: 'var(--color-text-primary, #0f172a)', display: 'block' }}>
+                      {rest.name}
+                    </strong>
+                    <span style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 600 }}>
+                      Specialty: {rest.specialty}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--color-accent, #2563eb)', fontWeight: 800 }}>
+                    {rest.priceRange}
                   </span>
                 </div>
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-accent, #2563eb)', fontWeight: 800 }}>
-                  {rest.priceRange}
-                </span>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         )}
       </div>
 
-      {/* 4. PRIMARY ACTION BUTTON: Explore [Destination] → (Reference 3 blue button) */}
+      {/* 4. PRIMARY ACTION BUTTON: Explore [Destination] */}
       <div style={{
         padding: '12px 16px',
         borderTop: '1px solid var(--glass-border, rgba(15,23,42,0.08))',
@@ -576,7 +633,7 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({
     </div>
   );
 
-  if (inline) {
+  if (isInline) {
     return panelContent;
   }
 
@@ -602,4 +659,3 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({
     </motion.aside>
   );
 };
-

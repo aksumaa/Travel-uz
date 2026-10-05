@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { 
   Search, MapPin, Star, Compass, Shield, Sparkles, 
   ArrowRight, CreditCard, Navigation, Coffee, Landmark 
-} from 'lucide-react';
+} from '../icons';
 import { useCurrency } from '../context/CurrencyContext';
 import { PlaceDetailModal, type PlaceDetailData } from '../components/PlaceDetailModal';
 

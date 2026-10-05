@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plane, Sun, Moon, LogOut, Calendar, Menu, X, ChevronDown, LayoutDashboard, Compass } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Plane, Sun, Moon, LogOut, Calendar, Menu, X, ChevronDown, LayoutDashboard, Compass, Shield, Building2, DollarSign } from '../../icons';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useCurrency } from '../../context/CurrencyContext';
 import type { Language } from '../../locales/translations';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -14,13 +16,17 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
   const { user, logout, setShowAuthModal } = useAuth();
   const { t, language, setLanguage } = useLanguage();
   const { theme, toggleTheme } = useTheme();
+  const { currency, setCurrency, currencies, currentConfig } = useCurrency();
+  const router = useRouter();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
+  const [isCurrencyDropdownOpen, setIsCurrencyDropdownOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
   const langRef = useRef<HTMLDivElement>(null);
+  const currencyRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
   // Monitor page scroll to update style state
@@ -37,6 +43,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
     const handleClickOutside = (event: MouseEvent) => {
       if (langRef.current && !langRef.current.contains(event.target as Node)) {
         setIsLangDropdownOpen(false);
+      }
+      if (currencyRef.current && !currencyRef.current.contains(event.target as Node)) {
+        setIsCurrencyDropdownOpen(false);
       }
       if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
         setIsProfileDropdownOpen(false);
@@ -65,13 +74,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
 
   const currentLangDetails = getLanguageDetails(language);
 
-  // Nav list configurations
-  const navLinks = [
-    { label: t('nav.explore'), href: '#destinations' },
-    { label: t('nav.planner'), href: '#planner' },
-    { label: t('nav.trips'), href: user ? '#trips' : '#planner' },
-    { label: t('nav.about'), href: '#about' }
-  ];
+  const handleHomeClick = () => {
+    if (onNavigateHome) {
+      onNavigateHome();
+    } else {
+      router.push('/');
+    }
+  };
 
   return (
     <motion.header
@@ -91,18 +100,18 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 40px',
+        padding: '0 28px',
         zIndex: 1000,
       }}
     >
       {/* Left: Brand Logo */}
       <div 
-        onClick={onNavigateHome}
+        onClick={handleHomeClick}
         style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
       >
         <div style={{
-          width: '32px',
-          height: '32px',
+          width: '34px',
+          height: '34px',
           borderRadius: '10px',
           background: 'linear-gradient(135deg, var(--accent, #2563eb), #7c3aed)',
           display: 'flex',
@@ -111,7 +120,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
           color: '#ffffff',
           boxShadow: '0 4px 14px rgba(37, 99, 235, 0.4)'
         }}>
-          <Compass size={18} />
+          <Compass size={19} />
         </div>
         <span
           style={{
@@ -126,39 +135,166 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
         </span>
       </div>
 
-      {/* Center: Nav links (Desktop - Guest view) */}
-      {!user && (
-        <nav
-          className="desktop-only"
+      {/* Center: Navigation Links */}
+      <nav
+        className="desktop-only"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '24px',
+        }}
+      >
+        <button
+          onClick={() => router.push('/dashboard')}
           style={{
+            background: 'transparent',
+            border: 'none',
+            fontSize: '0.88rem',
+            fontWeight: 700,
+            color: 'var(--text-secondary)',
+            cursor: 'pointer',
+            transition: 'color 0.2s',
             display: 'flex',
             alignItems: 'center',
-            gap: '32px',
+            gap: '6px'
           }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = '#2563eb')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-secondary)')}
         >
-          {navLinks.map((link) => (
-            <a
-              key={link.label}
-              href={link.href}
-              style={{
-                fontSize: '0.9rem',
-                fontWeight: 600,
-                color: 'var(--text-secondary)',
-                textDecoration: 'none',
-                transition: 'color 0.2s',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent)')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-secondary)')}
-            >
-              {link.label}
-            </a>
-          ))}
-        </nav>
-      )}
+          <LayoutDashboard size={15} />
+          <span>Traveler</span>
+        </button>
+
+        <button
+          onClick={() => router.push('/agency/dashboard')}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            fontSize: '0.88rem',
+            fontWeight: 700,
+            color: 'var(--text-secondary)',
+            cursor: 'pointer',
+            transition: 'color 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = '#2563eb')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-secondary)')}
+        >
+          <Building2 size={15} />
+          <span>Agency</span>
+        </button>
+
+        <button
+          onClick={() => router.push('/admin')}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            fontSize: '0.88rem',
+            fontWeight: 700,
+            color: 'var(--text-secondary)',
+            cursor: 'pointer',
+            transition: 'color 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = '#2563eb')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-secondary)')}
+        >
+          <Shield size={15} />
+          <span>Admin</span>
+        </button>
+      </nav>
 
       {/* Right: Controls Panel */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         
+        {/* Currency dropdown */}
+        <div ref={currencyRef} style={{ position: 'relative' }}>
+          <button
+            onClick={() => setIsCurrencyDropdownOpen(!isCurrencyDropdownOpen)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              height: '38px',
+              padding: '0 10px',
+              borderRadius: '10px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid var(--border)',
+              color: 'var(--text-primary)',
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+          >
+            <span>{currentConfig?.symbol || '$'}</span>
+            <span>{currency}</span>
+            <ChevronDown size={13} style={{ opacity: 0.6 }} />
+          </button>
+
+          <AnimatePresence>
+            {isCurrencyDropdownOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                transition={{ duration: 0.15 }}
+                className="glass-card"
+                style={{
+                  position: 'absolute',
+                  top: '46px',
+                  right: 0,
+                  width: '160px',
+                  padding: '6px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '3px',
+                  zIndex: 1001,
+                  boxShadow: 'var(--glass-shadow)',
+                  background: 'var(--color-bg-surface, #ffffff)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '12px'
+                }}
+              >
+                {currencies.map((curr) => {
+                  const isSelected = currency === curr.code;
+                  return (
+                    <button
+                      key={curr.code}
+                      onClick={() => {
+                        setCurrency(curr.code);
+                        setIsCurrencyDropdownOpen(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '7px 10px',
+                        borderRadius: '8px',
+                        textAlign: 'left',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        color: isSelected ? 'var(--accent, #2563eb)' : 'var(--text-secondary)',
+                        background: isSelected ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        border: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <span>{curr.code} ({curr.symbol})</span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{curr.name}</span>
+                    </button>
+                  );
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
         {/* Language dropdown */}
         <div ref={langRef} style={{ position: 'relative' }}>
           <button
@@ -167,20 +303,21 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              height: '40px',
-              padding: '0 12px',
+              height: '38px',
+              padding: '0 10px',
               borderRadius: '10px',
               background: 'rgba(255, 255, 255, 0.05)',
               border: '1px solid var(--border)',
               color: 'var(--text-primary)',
-              fontSize: '0.85rem',
-              fontWeight: 600,
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              cursor: 'pointer',
               transition: 'all 0.2s',
             }}
           >
-            <span style={{ fontSize: '1rem' }}>{currentLangDetails.flag}</span>
+            <span style={{ fontSize: '0.95rem' }}>{currentLangDetails.flag}</span>
             <span>{currentLangDetails.code}</span>
-            <ChevronDown size={14} style={{ opacity: 0.6 }} />
+            <ChevronDown size={13} style={{ opacity: 0.6 }} />
           </button>
 
           <AnimatePresence>
@@ -193,7 +330,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
                 className="glass-card"
                 style={{
                   position: 'absolute',
-                  top: '50px',
+                  top: '46px',
                   right: 0,
                   width: '140px',
                   padding: '6px',
@@ -202,6 +339,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
                   gap: '4px',
                   zIndex: 1001,
                   boxShadow: 'var(--glass-shadow)',
+                  background: 'var(--color-bg-surface, #ffffff)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '12px'
                 }}
               >
                 {(['uz', 'ru', 'en'] as Language[]).map((lang) => {
@@ -216,20 +356,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
                         padding: '8px 12px',
                         borderRadius: '8px',
                         textAlign: 'left',
-                        fontSize: '0.85rem',
+                        fontSize: '0.82rem',
                         fontWeight: 600,
-                        color: isSelected ? 'var(--accent)' : 'var(--text-secondary)',
+                        color: isSelected ? 'var(--accent, #2563eb)' : 'var(--text-secondary)',
                         background: isSelected ? 'rgba(37, 99, 235, 0.08)' : 'transparent',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
-                        transition: 'all 0.2s',
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isSelected) e.currentTarget.style.background = 'transparent';
+                        border: 'none',
+                        cursor: 'pointer'
                       }}
                     >
                       <span>{details.flag}</span>
@@ -246,8 +381,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
         <button
           onClick={toggleTheme}
           style={{
-            width: '40px',
-            height: '40px',
+            width: '38px',
+            height: '38px',
             borderRadius: '10px',
             background: 'rgba(255, 255, 255, 0.05)',
             border: '1px solid var(--border)',
@@ -256,24 +391,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
             justifyContent: 'center',
             color: 'var(--text-primary)',
             transition: 'all 0.2s',
-            overflow: 'hidden',
+            cursor: 'pointer'
           }}
+          title="Toggle Theme"
         >
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={theme}
-              initial={{ y: -20, opacity: 0, rotate: -40 }}
-              animate={{ y: 0, opacity: 1, rotate: 0 }}
-              exit={{ y: 20, opacity: 0, rotate: 40 }}
-              transition={{ duration: 0.2 }}
-            >
-              {theme === 'dark' ? (
-                <Moon size={18} style={{ color: 'var(--text-primary)' }} />
-              ) : (
-                <Sun size={18} style={{ color: '#F59E0B' }} />
-              )}
-            </motion.div>
-          </AnimatePresence>
+          {theme === 'dark' ? (
+            <Moon size={16} style={{ color: 'var(--text-primary)' }} />
+          ) : (
+            <Sun size={16} style={{ color: '#F59E0B' }} />
+          )}
         </button>
 
         {/* Authentication Section */}
@@ -286,15 +412,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  height: '40px',
-                  padding: '0 8px 0 12px',
+                  height: '38px',
+                  padding: '0 8px 0 10px',
                   borderRadius: '10px',
                   background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid var(--border)',
-                  transition: 'all 0.2s',
+                  cursor: 'pointer'
                 }}
               >
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                   {user.name}
                 </span>
                 <img
@@ -319,159 +445,197 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
                     className="glass-card"
                     style={{
                       position: 'absolute',
-                      top: '50px',
+                      top: '46px',
                       right: 0,
-                      width: '180px',
+                      width: '200px',
                       padding: '6px',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '4px',
                       zIndex: 1001,
+                      background: 'var(--color-bg-surface, #ffffff)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '14px',
+                      boxShadow: 'var(--glass-shadow)'
                     }}
                   >
                     <button
-                      onClick={onNavigateHome}
+                      onClick={() => {
+                        setIsProfileDropdownOpen(false);
+                        router.push('/dashboard');
+                      }}
                       style={{
                         width: '100%',
-                        padding: '10px 12px',
+                        padding: '9px 12px',
                         borderRadius: '8px',
                         textAlign: 'left',
-                        fontSize: '0.85rem',
+                        fontSize: '0.82rem',
                         fontWeight: 600,
                         color: 'var(--text-secondary)',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
-                        transition: 'all 0.2s',
+                        border: 'none',
+                        background: 'transparent',
+                        cursor: 'pointer'
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)')}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                     >
                       <LayoutDashboard size={14} />
-                      <span>{t('dashboard.explore')}</span>
+                      <span>Traveler Dashboard</span>
                     </button>
                     <button
+                      onClick={() => {
+                        setIsProfileDropdownOpen(false);
+                        router.push('/agency/dashboard');
+                      }}
                       style={{
                         width: '100%',
-                        padding: '10px 12px',
+                        padding: '9px 12px',
                         borderRadius: '8px',
                         textAlign: 'left',
-                        fontSize: '0.85rem',
+                        fontSize: '0.82rem',
                         fontWeight: 600,
                         color: 'var(--text-secondary)',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
-                        transition: 'all 0.2s',
+                        border: 'none',
+                        background: 'transparent',
+                        cursor: 'pointer'
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)')}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                     >
-                      <Calendar size={14} />
-                      <span>{t('nav.trips')}</span>
+                      <Building2 size={14} />
+                      <span>Agency Portal</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsProfileDropdownOpen(false);
+                        router.push('/admin');
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '9px 12px',
+                        borderRadius: '8px',
+                        textAlign: 'left',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        color: 'var(--text-secondary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        border: 'none',
+                        background: 'transparent',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Shield size={14} />
+                      <span>Admin Console</span>
                     </button>
                     <div style={{ height: '1px', background: 'var(--border)', margin: '4px 0' }} />
                     <button
                       onClick={() => {
                         logout();
                         setIsProfileDropdownOpen(false);
+                        router.push('/');
                       }}
                       style={{
                         width: '100%',
-                        padding: '10px 12px',
+                        padding: '9px 12px',
                         borderRadius: '8px',
                         textAlign: 'left',
-                        fontSize: '0.85rem',
+                        fontSize: '0.82rem',
                         fontWeight: 600,
-                        color: '#f87171',
+                        color: '#ef4444',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
-                        transition: 'all 0.2s',
+                        border: 'none',
+                        background: 'transparent',
+                        cursor: 'pointer'
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)')}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                     >
                       <LogOut size={14} />
-                      <span>{t('common.back')}</span> {/*signOut maps to common.back in legacy keys */}
+                      <span>Sign Out</span>
                     </button>
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
           ) : (
-            <button
-              onClick={() => setShowAuthModal(true)}
-              className="btn-primary"
-              style={{ padding: '8px 18px', borderRadius: '10px', fontSize: '0.85rem' }}
-            >
-              {t('nav.login')}
-            </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="btn-primary"
+                style={{ padding: '8px 16px', borderRadius: '10px', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer' }}
+              >
+                Open Dashboard
+              </button>
+            </div>
           )}
         </div>
 
-        {/* Mobile menu toggle (Only visible when not logged in) */}
-        {!user && (
-          <button
-            className="mobile-only"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '10px',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid var(--border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--text-primary)',
-            }}
-          >
-            {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
-          </button>
-        )}
+        {/* Mobile menu toggle */}
+        <button
+          className="mobile-only"
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          style={{
+            width: '38px',
+            height: '38px',
+            borderRadius: '10px',
+            background: 'rgba(255, 255, 255, 0.05)',
+            border: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--text-primary)',
+            cursor: 'pointer'
+          }}
+        >
+          {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+        </button>
       </div>
 
       {/* Slide-down Mobile Menu Drawer */}
       <AnimatePresence>
-        {isMobileMenuOpen && !user && (
+        {isMobileMenuOpen && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.25 }}
             style={{
               position: 'fixed',
               top: '70px',
               left: 0,
               right: 0,
-              background: 'var(--bg-primary)',
+              background: 'var(--color-bg-surface, #ffffff)',
               borderBottom: '1px solid var(--border)',
               zIndex: 999,
+              padding: '20px',
               display: 'flex',
               flexDirection: 'column',
-              padding: '24px 40px',
-              gap: '20px',
-              overflow: 'hidden',
+              gap: '12px',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.15)'
             }}
           >
-            {navLinks.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                onClick={() => setIsMobileMenuOpen(false)}
-                style={{
-                  fontSize: '1.1rem',
-                  fontWeight: 600,
-                  color: 'var(--text-primary)',
-                  textDecoration: 'none',
-                  padding: '8px 0',
-                  borderBottom: '1px solid rgba(255,255,255,0.02)',
-                }}
-              >
-                {link.label}
-              </a>
-            ))}
+            <button
+              onClick={() => { setIsMobileMenuOpen(false); router.push('/dashboard'); }}
+              style={{ padding: '12px', borderRadius: '10px', background: 'rgba(37,99,235,0.08)', color: '#2563eb', border: 'none', fontWeight: 700, textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px' }}
+            >
+              <LayoutDashboard size={16} /> Traveler Dashboard
+            </button>
+            <button
+              onClick={() => { setIsMobileMenuOpen(false); router.push('/agency/dashboard'); }}
+              style={{ padding: '12px', borderRadius: '10px', background: 'rgba(124,58,237,0.08)', color: '#7c3aed', border: 'none', fontWeight: 700, textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px' }}
+            >
+              <Building2 size={16} /> Agency Portal
+            </button>
+            <button
+              onClick={() => { setIsMobileMenuOpen(false); router.push('/admin'); }}
+              style={{ padding: '12px', borderRadius: '10px', background: 'rgba(16,185,129,0.08)', color: '#10b981', border: 'none', fontWeight: 700, textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px' }}
+            >
+              <Shield size={16} /> Admin Console
+            </button>
           </motion.div>
         )}
       </AnimatePresence>

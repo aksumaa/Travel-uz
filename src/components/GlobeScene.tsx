@@ -4,7 +4,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Stars, useTexture, Html } from '@react-three/drei';
 import gsap from 'gsap';
 import type { CountryData } from './CountryInfoPanel';
-import { DESTINATIONS_CATALOG, type DestinationItem, resolveDestination } from '../services/destinationCatalog';
+import { DESTINATIONS_CATALOG, type DestinationItem, resolveDestination, generateDestinationForCountry } from '../services/destinationCatalog';
 import { FlightPathAnimation, toXYZ } from './FlightPathAnimation';
 
 export interface GlobeCountryData extends CountryData {
@@ -692,27 +692,23 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
         setAutoRotate(false);
 
         const name = countryFeature.properties.NAME;
-        const resolved = resolveDestination(name);
+        const resolved = resolveDestination(name, countryFeature.properties) || generateDestinationForCountry(name, countryFeature.properties.ISO_A3, lat, lng);
 
         if (resolved && onDestinationSelect) {
           onDestinationSelect(resolved);
         }
 
-        const normalizedId = name.toLowerCase().includes('united states') ? 'usa' :
-                             name.toLowerCase().includes('united arab') ? 'egypt' : 
-                             name.toLowerCase();
-
         if (onSelectCountry) {
-          onSelectCountry(normalizedId);
+          onSelectCountry(resolved.id);
         }
 
-        const details: CountryData = resolved ? {
+        const details: CountryData = {
           name: resolved.name,
           capital: resolved.capital || 'Capital',
           language: resolved.language,
           currency: resolved.currency,
           timezone: resolved.timezone,
-          population: 'Regional Hub',
+          population: countryFeature.properties.POP_EST ? `${(countryFeature.properties.POP_EST / 1000000).toFixed(1)} Million` : 'Regional Hub',
           area: '450,000 km²',
           flag: resolved.flag,
           weather: resolved.weather ? { temp: resolved.weather.tempC, condition: resolved.weather.condition } : { temp: 22, condition: 'Sunny' },
@@ -728,21 +724,6 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
             name: r.specialty,
             image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=400&q=80'
           }))
-        } : {
-          name: name,
-          capital: countryFeature.properties.FORMAL_EN?.split(' ').pop() || 'Unknown',
-          language: 'English',
-          currency: 'USD',
-          timezone: 'GMT+0',
-          population: countryFeature.properties.POP_EST ? `${(countryFeature.properties.POP_EST / 1000000).toFixed(1)} Million` : 'Unknown',
-          area: 'Unknown',
-          flag: '🌍',
-          weather: { temp: 22, condition: 'Sunny' },
-          visa: 'Visa Required',
-          bestTime: 'Spring, Autumn',
-          description: `${name} is a gorgeous destination.`,
-          attractions: [],
-          foods: []
         };
 
         if (onCountrySelect) {

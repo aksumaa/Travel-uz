@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Shield, Star, Hotel, Car, Utensils, UserCheck, 
   ArrowRight, Scale, Check, Send, X, AlertCircle, Sparkles 
-} from 'lucide-react';
+} from '../icons';
 import { useCurrency } from '../context/CurrencyContext';
 import { api } from '../services/api';
 import type { ReadyTourPackage } from '../types/travel';

@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { 
   Calendar, Plane, Hotel, Star, Compass, Heart, 
   Send, Trash2, Edit3, Share2, User, MapPin, Loader2 
-} from 'lucide-react';
+} from '../icons';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -20,30 +21,40 @@ import {
   User, Search, Sun, Moon, Bell, X, 
   ChevronDown, Users, 
   ArrowRight, Utensils, MapPin, Settings as SettingsIcon,
-  ChevronRight, Landmark, Plane, Tag, Luggage, Navigation
-} from 'lucide-react';
+  ChevronRight, Landmark, Plane, Tag, Luggage, Navigation,
+  MessageSquare, Shield, TrendingUp, Building2
+} from '../icons';
 import { CrmPipelineView } from '../components/CrmPipelineView';
 import { AgencyAnalyticsView } from '../components/AgencyAnalyticsView';
 import { TelegramSettingsView } from '../components/TelegramSettingsView';
 import { AgencyOnboardingModal } from '../components/AgencyOnboardingModal';
 import { api } from '../services/api';
-import { resolveDestination } from '../services/destinationCatalog';
+import { resolveDestination, generateDestinationForCountry } from '../services/destinationCatalog';
 
 interface DashboardProps {
   initialView?: string;
   onViewChange?: (view: string) => void;
+  variant?: 'user' | 'admin';
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onViewChange }) => {
-  const { user } = useAuth();
+export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onViewChange, variant = 'user' }) => {
+  const { user, logout } = useAuth();
+  const router = useRouter();
   const { theme, toggleTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
   const { currency, setCurrency, currencies, formatPrice } = useCurrency();
 
-  const [activeTab, setActiveTab] = useState<string>(initialView);
+  const [activeTab, setActiveTab] = useState<string>(variant === 'admin' ? (initialView === 'home' ? 'admin' : initialView) : initialView);
+
+  useEffect(() => {
+    if (initialView && initialView !== 'home') {
+      setActiveTab(initialView);
+    }
+  }, [initialView]);
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [plannerDestination, setPlannerDestination] = useState<string>('Samarkand, Uzbekistan');
   const [selectedCountryId, setSelectedCountryId] = useState('uzbekistan');
+  const [selectedFeature, setSelectedFeature] = useState<any>(null);
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
   const [isCurrencyDropdownOpen, setIsCurrencyDropdownOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
@@ -104,17 +115,37 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
   };
 
   // Mapped object representing current selected country for detail panel
-  const resolvedDest = resolveDestination(selectedCountryId);
-  const selectedCountryObj = resolvedDest || {
-    properties: {
-      NAME: selectedCountryId === 'uzbekistan' ? 'Uzbekistan' : selectedCountryId === 'usa' ? 'United States' : selectedCountryId === 'france' ? 'France' : selectedCountryId === 'japan' ? 'Japan' : selectedCountryId === 'brazil' ? 'Brazil' : selectedCountryId === 'australia' ? 'Australia' : 'Egypt',
-      ISO_A3: selectedCountryId === 'uzbekistan' ? 'UZB' : selectedCountryId === 'usa' ? 'USA' : selectedCountryId === 'france' ? 'FRA' : selectedCountryId === 'japan' ? 'JPN' : selectedCountryId === 'brazil' ? 'BRA' : selectedCountryId === 'australia' ? 'AUS' : 'EGY',
-      SUBREGION: 'Central Asia',
-      CONTINENT: 'Asia',
-      POP_EST: 35000000,
-      GDP_MD: 60000,
-    }
-  };
+  const resolvedDest = resolveDestination(selectedCountryId, selectedFeature?.properties);
+  const selectedCountryObj = resolvedDest || selectedFeature || generateDestinationForCountry(selectedCountryId || 'uzbekistan');
+
+  interface NavItem {
+    id: string;
+    label: string;
+    icon: React.ReactNode;
+    highlight?: boolean;
+  }
+
+  const userNav: NavItem[] = [
+    { id: 'home', label: t('dashboard.home') || 'Home', icon: <Compass size={17} /> },
+    { id: 'explore', label: t('dashboard.explore') || 'Explore', icon: <Map size={17} /> },
+    { id: 'planner', label: t('dashboard.planner') || 'AI Planner', icon: <Sparkles size={17} />, highlight: true },
+    { id: 'my-trips', label: t('dashboard.myTrips') || 'My Trips', icon: <Calendar size={17} /> },
+    { id: 'tours', label: t('dashboard.tours') || 'Tours', icon: <Luggage size={17} /> },
+    { id: 'saved', label: t('dashboard.saved') || 'Saved', icon: <Heart size={17} /> },
+    { id: 'community', label: t('dashboard.community') || 'Community', icon: <Users size={17} /> },
+    { id: 'profile', label: 'Profile & Preferences', icon: <User size={17} /> },
+    { id: 'settings', label: 'Settings', icon: <SettingsIcon size={17} /> },
+  ];
+
+  const adminNav: NavItem[] = [
+    { id: 'admin', label: 'Admin Console', icon: <Shield size={17} /> },
+    { id: 'crm', label: 'CRM Leads', icon: <Users size={17} /> },
+    { id: 'analytics', label: 'Agency Analytics', icon: <TrendingUp size={17} /> },
+    { id: 'telegram', label: 'Telegram Bot', icon: <MessageSquare size={17} /> },
+    { id: 'home', label: 'Traveler Dashboard', icon: <Compass size={17} /> },
+  ];
+
+  const navItems: NavItem[] = variant === 'admin' ? adminNav : userNav;
 
   const [showOnboardModal, setShowOnboardModal] = useState(false);
 
@@ -208,18 +239,32 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
           </div>
         </div>
 
-        {/* Navigation Items (Reference 3) */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', overflowY: 'auto', flex: 1 }} className="sidebar-scrollable-links">
-          {[
-            { id: 'home', label: t('dashboard.home'), icon: <Compass size={17} /> },
-            { id: 'explore', label: t('dashboard.explore'), icon: <Map size={17} /> },
-            { id: 'planner', label: t('dashboard.planner'), icon: <Sparkles size={17} />, highlight: true },
-            { id: 'my-trips', label: t('dashboard.myTrips'), icon: <Calendar size={17} /> },
-            { id: 'tours', label: t('dashboard.tours'), icon: <Luggage size={17} /> },
-            { id: 'saved', label: t('dashboard.saved'), icon: <Heart size={17} /> },
-            { id: 'community', label: t('dashboard.community'), icon: <Users size={17} /> },
-          ].map(item => {
-            const isActive = activeTab === item.id;
+        {variant === 'admin' && (
+          <button
+            onClick={() => setShowOnboardModal(true)}
+            style={{
+              padding: '10px 14px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, var(--color-accent), var(--color-purple))',
+              color: '#ffffff',
+              fontWeight: 800,
+              fontSize: '0.8rem',
+              border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              cursor: 'pointer'
+            }}
+          >
+            <Building2 size={16} /> Onboard Agency
+          </button>
+        )}
+
+        {/* Navigation Items */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto', flex: 1 }} className="sidebar-scrollable-links">
+          {navItems.map(item => {
+            const isActive = activeTab === item.id || (item.id === 'ready-trips' && activeTab === 'ready');
             return (
               <button
                 key={item.id}
@@ -336,6 +381,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
             <ArrowRight size={12} />
           </button>
         </div>
+        {/* Logout */}
+        <button
+          onClick={() => {
+            logout();
+            router.push('/');
+          }}
+          style={{
+            padding: '10px 14px',
+            borderRadius: '10px',
+            border: '1px solid rgba(239, 68, 68, 0.2)',
+            background: 'rgba(239, 68, 68, 0.05)',
+            color: '#ef4444',
+            fontWeight: 700,
+            fontSize: '0.8rem',
+            cursor: 'pointer'
+          }}
+        >
+          {t('navbar.signOut')}
+        </button>
       </aside>
 
       {/* ==================== MAIN VIEW WRAPPER ==================== */}
@@ -657,6 +721,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
                       selectedCountryId={selectedCountryId}
                       compact={true}
                       onSelectCountry={(id) => setSelectedCountryId(id)}
+                      onSelectedFeature={(feat) => setSelectedFeature(feat)}
                       onCreateTrip={() => handleStartPlanningFor(selectedCountryId)}
                     />
                   </div>

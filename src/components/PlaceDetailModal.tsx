@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, MapPin, Clock, DollarSign, Star, Shield, Sparkles, Navigation, Heart, Check } from 'lucide-react';
+import { X, MapPin, Clock, DollarSign, Star, Shield, Sparkles, Navigation, Heart, Check } from '../icons';
 import { useCurrency } from '../context/CurrencyContext';
 
 export interface PlaceDetailData {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ReadyToursSection } from '../components/ReadyToursSection';
-import { Shield, Sparkles, Filter, Search } from 'lucide-react';
+import { Shield, Sparkles, Filter, Search } from '../icons';
 import { useLanguage } from '../context/LanguageContext';
 
 export const ToursMarketplaceView: React.FC = () => {

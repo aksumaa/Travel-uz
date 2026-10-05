@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Compass, Download, Send, CheckCircle, AlertCircle, Shield } from 'lucide-react';
+import { Compass, Download, Send, CheckCircle, AlertCircle, Shield } from '../icons';
 import { api } from '../services/api';
+import { openItineraryPrint } from '../services/printItinerary';
 
 interface PublicItineraryViewProps {
   shareToken: string;
@@ -119,10 +120,7 @@ export const PublicItineraryView: React.FC<PublicItineraryViewProps> = ({ shareT
 
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <button
-              onClick={() => {
-                const pdfUrl = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'}/trips/${data.id}/pdf`;
-                window.open(pdfUrl, '_blank');
-              }}
+              onClick={() => openItineraryPrint(data.title || 'TravelUZ itinerary', itin.summary || '', itin.days || [])}
               style={{ padding: '10px 16px', borderRadius: '10px', background: 'var(--color-bg-subtle)', border: '1px solid var(--glass-border)', color: 'var(--color-text-primary)', fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
             >
               <Download size={16} /> PDF Brochure

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Check, AlertCircle, Shield, Sparkles, Building2, Calendar, User, ArrowRight } from 'lucide-react';
+import { X, Check, AlertCircle, Shield, Sparkles, Building2, Calendar, User, ArrowRight } from '../icons';
 import { useCurrency } from '../context/CurrencyContext';
 import type { ReadyTourPackage } from '../types/travel';
 

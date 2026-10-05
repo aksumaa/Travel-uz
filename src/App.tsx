@@ -10,8 +10,8 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { CurrencyProvider } from './context/CurrencyContext';
 
 // Lazy loaded page components
-const LandingPage = lazy(() => import('./pages/LandingPage').then(m => ({ default: m.LandingPage })));
-const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
+const LandingPage = lazy(() => import('./views/LandingPage').then(m => ({ default: m.LandingPage })));
+const Dashboard = lazy(() => import('./views/Dashboard').then(m => ({ default: m.Dashboard })));
 const PublicItineraryView = lazy(() => import('./components/PublicItineraryView').then(m => ({ default: m.PublicItineraryView })));
 
 function AppContent() {
@@ -20,7 +20,7 @@ function AppContent() {
   const { user } = useAuth();
 
   // Check public itinerary link
-  const pathname = window.location.pathname;
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
   const isPublicTrip = pathname.startsWith('/trip/');
   const shareToken = isPublicTrip ? pathname.replace('/trip/', '').split('/')[0] : '';
 

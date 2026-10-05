@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plane, Send, ArrowUpRight } from 'lucide-react';
+import { Plane, Send, ArrowUpRight } from '../../icons';
 import { useLanguage } from '../../context/LanguageContext';
 
 const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -208,6 +208,9 @@ export const Footer: React.FC = () => {
               </a>
             </li>
             <li>
+              <a href="/admin" style={{ color: 'inherit', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent)')} onMouseLeave={(e) => (e.currentTarget.style.color = 'inherit')}>
+                Admin panel
+              </a>
               <a href="#careers" style={{ color: 'inherit', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent)')} onMouseLeave={(e) => (e.currentTarget.style.color = 'inherit')}>
                 {t('footer.careers')}
               </a>

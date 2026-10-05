@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, Users, DollarSign, CheckCircle2 } from 'lucide-react';
+import { TrendingUp, Users, DollarSign, CheckCircle2 } from '../icons';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, BarChart, Bar, PieChart, Pie, Cell
 } from 'recharts';

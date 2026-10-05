@@ -4,7 +4,7 @@ import {
   Sparkles, Compass, 
   ArrowRight, ArrowLeft, Check, 
   Car, Utensils
-} from 'lucide-react';
+} from '../icons';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLanguage } from '../context/LanguageContext';
 import { api } from '../services/api';

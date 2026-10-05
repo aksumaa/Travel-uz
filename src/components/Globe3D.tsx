@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Search, MapPin, Sparkles, Navigation, X, Plus, Minus, Crosshair, Play, ChevronRight, Compass } from 'lucide-react';
+import { Search, MapPin, Sparkles, Navigation, X, Plus, Minus, Crosshair, Play, ChevronRight, Compass } from '../icons';
 import { CountryInfoPanel } from './CountryInfoPanel';
 import type { CountryData } from './CountryInfoPanel';
 import { GlobeScene, COUNTRIES } from './GlobeScene';
@@ -18,14 +18,15 @@ export { COUNTRIES };
 
 interface GlobeProps {
   onCountrySelect?: (country: CountryData) => void;
+  onSelectCountry?: (countryId: string) => void;
   onDestinationSelect?: (destination: DestinationItem) => void;
   selectedCountry?: string | null;
   selectedCountryId?: string | null;
-  onSelectCountry?: (countryId: string) => void;
   onCreateTrip?: (destination: any) => void;
   compact?: boolean;
   showSearchBar?: boolean;
   initialDestinationId?: string;
+  onSelectedFeature?: (feature: any) => void;
 }
 
 export const Globe3D: React.FC<GlobeProps> = ({
@@ -37,7 +38,8 @@ export const Globe3D: React.FC<GlobeProps> = ({
   onCreateTrip,
   compact = false,
   showSearchBar = true,
-  initialDestinationId = 'uzbekistan'
+  initialDestinationId = 'uzbekistan',
+  onSelectedFeature
 }) => {
   // Destination and flight states
   const [activeDestination, setActiveDestination] = useState<DestinationItem | null>(() => {
@@ -57,6 +59,12 @@ export const Globe3D: React.FC<GlobeProps> = ({
   const [selectedCountryFeature, setSelectedCountryFeature] = useState<any>(null);
   const [autoRotate, setAutoRotate] = useState(true);
   const [zoomLevel, setZoomLevel] = useState(1);
+
+  React.useEffect(() => {
+    onSelectedFeature?.(selectedCountryFeature);
+  }, [selectedCountryFeature, onSelectedFeature]);
+
+  // Refs
   const autoRotateTimerRef = useRef<any>(null);
 
   // Synchronize when external props change
@@ -130,6 +138,7 @@ export const Globe3D: React.FC<GlobeProps> = ({
 
   // Close info panel
   const handlePanelClose = () => {
+    setActiveDestination(null);
     setSelectedCountryFeature(null);
   };
 

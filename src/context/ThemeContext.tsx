@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 
 type Theme = 'dark' | 'light';
 
@@ -10,27 +10,27 @@ interface ThemeContextProps {
 const ThemeContext = createContext<ThemeContextProps | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setTheme] = useState<Theme>(() => {
-    const saved = localStorage.getItem('traveluz-theme');
-    if (saved === 'dark' || saved === 'light') {
-      return saved as Theme;
-    }
-    return 'light'; // Default theme: LIGHT (TripMind design direction)
-  });
+  const [theme, setTheme] = useState<Theme>('dark');
+  const hydrated = useRef(false);
 
   useEffect(() => {
+    if (!hydrated.current) {
+      hydrated.current = true;
+      const saved = localStorage.getItem('traveluz-theme');
+      if (saved === 'dark' || saved === 'light') {
+        setTheme(saved as Theme);
+        return;
+      }
+    }
     localStorage.setItem('traveluz-theme', theme);
     const root = document.documentElement;
-    
-    // Set smooth transition on root element style
     root.style.transition = 'all 0.3s';
-    
     if (theme === 'light') {
       root.classList.add('light');
-      root.classList.remove('dark-theme'); // for safety/legacy compat
+      root.classList.remove('dark-theme');
     } else {
       root.classList.remove('light');
-      root.classList.add('dark-theme'); // for safety/legacy compat
+      root.classList.add('dark-theme');
     }
   }, [theme]);
 
