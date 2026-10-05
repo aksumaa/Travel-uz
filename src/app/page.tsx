@@ -1,8 +1,6 @@
 'use client';
 
-import dynamic from 'next/dynamic';
-
-const HomePage = dynamic(() => import('../site/HomePage').then((mod) => mod.HomePage), { ssr: false });
+import { HomePage } from '../site/HomePage';
 
 export default function Page() {
   return <HomePage />;

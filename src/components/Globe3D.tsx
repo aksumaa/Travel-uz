@@ -41,6 +41,13 @@ export const Globe3D: React.FC<GlobeProps> = ({
   initialDestinationId = 'uzbekistan',
   onSelectedFeature
 }) => {
+  // Mounting state for SSR safety
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   // Destination and flight states
   const [activeDestination, setActiveDestination] = useState<DestinationItem | null>(() => {
     return resolveDestination(selectedCountry || selectedCountryId || initialDestinationId) || DESTINATIONS_CATALOG[0];
@@ -322,42 +329,44 @@ export const Globe3D: React.FC<GlobeProps> = ({
       )}
 
       {/* THREE.JS WEBGL CANVAS */}
-      <Canvas
-        camera={{ position: [0, 0, 5.8], fov: 45 }}
-        gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
-        dpr={isMobile ? 1 : Math.min(window.devicePixelRatio, 1.5)}
-        style={{ background: 'transparent', outline: 'none' }}
-      >
-        <Suspense fallback={null}>
-          <GlobeScene
-            activeSelectedId={activeDestination?.id || selectedCountry || selectedCountryId || null}
-            activeDestination={activeDestination}
-            previousDestination={previousDestination}
-            flightActive={flightActive}
-            selectedCountryFeature={selectedCountryFeature}
-            hoveredCountryFeature={hoveredCountryFeature}
-            onHoverCountryFeatureChange={setHoveredCountryFeature}
-            onSelectCountryFeatureChange={setSelectedCountryFeature}
-            onCountrySelect={onCountrySelect}
-            onDestinationSelect={(dest) => {
-              if (activeDestination?.id !== dest.id) {
-                setPreviousDestination(activeDestination);
-                setFlightActive(true);
-                setActiveDestination(dest);
-              }
-              if (onDestinationSelect) onDestinationSelect(dest);
-            }}
-            onSelectCountry={onSelectCountry}
-            onFlightArrival={() => {
-              // Smoothly mark flight arrival
-              setFlightActive(false);
-            }}
-            autoRotate={autoRotate}
-            setAutoRotate={setAutoRotate}
-            zoomLevel={zoomLevel}
-          />
-        </Suspense>
-      </Canvas>
+      {isMounted && (
+        <Canvas
+          camera={{ position: [0, 0, 5.8], fov: 45 }}
+          gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
+          dpr={isMobile ? 1 : Math.min(window.devicePixelRatio, 1.5)}
+          style={{ background: 'transparent', outline: 'none' }}
+        >
+          <Suspense fallback={null}>
+            <GlobeScene
+              activeSelectedId={activeDestination?.id || selectedCountry || selectedCountryId || null}
+              activeDestination={activeDestination}
+              previousDestination={previousDestination}
+              flightActive={flightActive}
+              selectedCountryFeature={selectedCountryFeature}
+              hoveredCountryFeature={hoveredCountryFeature}
+              onHoverCountryFeatureChange={setHoveredCountryFeature}
+              onSelectCountryFeatureChange={setSelectedCountryFeature}
+              onCountrySelect={onCountrySelect}
+              onDestinationSelect={(dest) => {
+                if (activeDestination?.id !== dest.id) {
+                  setPreviousDestination(activeDestination);
+                  setFlightActive(true);
+                  setActiveDestination(dest);
+                }
+                if (onDestinationSelect) onDestinationSelect(dest);
+              }}
+              onSelectCountry={onSelectCountry}
+              onFlightArrival={() => {
+                // Smoothly mark flight arrival
+                setFlightActive(false);
+              }}
+              autoRotate={autoRotate}
+              setAutoRotate={setAutoRotate}
+              zoomLevel={zoomLevel}
+            />
+          </Suspense>
+        </Canvas>
+      )}
 
       {/* Top-Left Target Crosshair Button (Reference 3) */}
       <div style={{ position: 'absolute', top: '20px', left: '20px', zIndex: 110 }}>
