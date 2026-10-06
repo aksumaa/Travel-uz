@@ -47,6 +47,10 @@ export interface DestinationItem {
   lng: number;
   type: 'country' | 'city' | 'region';
   capital?: string;
+  population?: string;
+  callingCode?: string;
+  region?: string;
+  subregion?: string;
   currency: string;
   currencySymbol: string;
   language: string;
@@ -645,33 +649,36 @@ const COUNTRY_META_DICT: Record<string, {
   currencySymbol: string;
   language: string;
   timezone: string;
+  population: string;
+  callingCode: string;
+  region: string;
   lat: number;
   lng: number;
   desc: string;
 }> = {
-  NER: { name: 'Niger', flag: '🇳🇪', capital: 'Niamey', currency: 'XOF', currencySymbol: 'CFA', language: 'French, Hausa', timezone: 'GMT+1', lat: 17.6078, lng: 8.0817, desc: 'Sahelian oasis of desert caravans and clay architecture in West Africa.' },
-  FRA: { name: 'France', flag: '🇫🇷', capital: 'Paris', currency: 'EUR', currencySymbol: '€', language: 'French', timezone: 'GMT+1', lat: 46.2276, lng: 2.2137, desc: 'World leader in art, culinary excellence, wine, and romantic landmarks.' },
-  UZB: { name: 'Uzbekistan', flag: '🇺🇿', capital: 'Tashkent', currency: 'UZS', currencySymbol: 'soʻm', language: 'Uzbek', timezone: 'GMT+5', lat: 41.3775, lng: 64.5853, desc: 'Legendary Silk Road crossroads with turquoise domes and ancient bazaars.' },
-  TUR: { name: 'Turkey', flag: '🇹🇷', capital: 'Ankara', currency: 'TRY', currencySymbol: '₺', language: 'Turkish', timezone: 'GMT+3', lat: 38.9637, lng: 35.2433, desc: 'Transcontinental bridge of Byzantine and Ottoman history and scenic coasts.' },
-  JPN: { name: 'Japan', flag: '🇯🇵', capital: 'Tokyo', currency: 'JPY', currencySymbol: '¥', language: 'Japanese', timezone: 'GMT+9', lat: 36.2048, lng: 138.2529, desc: 'Land of the Rising Sun blending ancient shrines and ultra-modern innovation.' },
-  USA: { name: 'United States', flag: '🇺🇸', capital: 'Washington, D.C.', currency: 'USD', currencySymbol: '$', language: 'English', timezone: 'GMT-5', lat: 37.0902, lng: -95.7129, desc: 'Expansive continent-spanning nation of world-class cities and majestic national parks.' },
-  EGY: { name: 'Egypt', flag: '🇪🇬', capital: 'Cairo', currency: 'EGP', currencySymbol: 'E£', language: 'Arabic', timezone: 'GMT+2', lat: 26.8206, lng: 30.8025, desc: 'Millennia of pharaonic wonders, Nile river journeys, and vibrant bazaars.' },
-  ARE: { name: 'United Arab Emirates', flag: '🇦🇪', capital: 'Abu Dhabi', currency: 'AED', currencySymbol: 'AED', language: 'Arabic', timezone: 'GMT+4', lat: 23.4241, lng: 53.8478, desc: 'Futuristic desert oasis with gleaming skyscrapers and luxury hospitality.' },
-  ITA: { name: 'Italy', flag: '🇮🇹', capital: 'Rome', currency: 'EUR', currencySymbol: '€', language: 'Italian', timezone: 'GMT+1', lat: 41.8719, lng: 12.5674, desc: 'Cradle of ancient Rome, Renaissance art, Tuscan vineyards, and Mediterranean cuisine.' },
-  DEU: { name: 'Germany', flag: '🇩🇪', capital: 'Berlin', currency: 'EUR', currencySymbol: '€', language: 'German', timezone: 'GMT+1', lat: 51.1657, lng: 10.4515, desc: 'Heart of central Europe known for castles, Rhine valleys, and cultural vitality.' },
-  BRA: { name: 'Brazil', flag: '🇧🇷', capital: 'Brasília', currency: 'BRL', currencySymbol: 'R$', language: 'Portuguese', timezone: 'GMT-3', lat: -14.235, lng: -51.9253, desc: 'South America vibrant giant of Amazon rainforests and sun-soaked Atlantic coasts.' },
-  GBR: { name: 'United Kingdom', flag: '🇬🇧', capital: 'London', currency: 'GBP', currencySymbol: '£', language: 'English', timezone: 'GMT+0', lat: 55.3781, lng: -3.436, desc: 'Rich historic kingdom of royal palaces, lush countryside, and global culture.' },
-  IND: { name: 'India', flag: '🇮🇳', capital: 'New Delhi', currency: 'INR', currencySymbol: '₹', language: 'Hindi, English', timezone: 'GMT+5:30', lat: 20.5937, lng: 78.9629, desc: 'Vibrant subcontinent of timeless temples, rich spices, and royal Rajasthani forts.' },
-  CHN: { name: 'China', flag: '🇨🇳', capital: 'Beijing', currency: 'CNY', currencySymbol: '¥', language: 'Mandarin', timezone: 'GMT+8', lat: 35.8617, lng: 104.1954, desc: 'Ancient civilization of the Great Wall, Silk Road heritage, and energetic modern megacities.' },
-  ESP: { name: 'Spain', flag: '🇪🇸', capital: 'Madrid', currency: 'EUR', currencySymbol: '€', language: 'Spanish', timezone: 'GMT+1', lat: 40.4637, lng: -3.7492, desc: 'Sun-drenched Mediterranean realm of flamenco, tapas, and Gaudí architecture.' },
-  AUS: { name: 'Australia', flag: '🇦🇺', capital: 'Canberra', currency: 'AUD', currencySymbol: 'A$', language: 'English', timezone: 'GMT+10', lat: -25.2744, lng: 133.7751, desc: 'Island continent of Great Barrier Reef wonders, golden surf beaches, and the Outback.' },
-  CAN: { name: 'Canada', flag: '🇨🇦', capital: 'Ottawa', currency: 'CAD', currencySymbol: 'C$', language: 'English, French', timezone: 'GMT-5', lat: 56.1304, lng: -106.3468, desc: 'Vast wilderness of turquoise glacial lakes, Rocky Mountains, and multicultural cities.' },
-  MAR: { name: 'Morocco', flag: '🇲🇦', capital: 'Rabat', currency: 'MAD', currencySymbol: 'MAD', language: 'Arabic, French', timezone: 'GMT+1', lat: 31.7917, lng: -7.0926, desc: 'Imperial kingdoms with labyrinthine medinas, Atlas peaks, and fragrant spice souks.' },
-  THA: { name: 'Thailand', flag: '🇹🇭', capital: 'Bangkok', currency: 'THB', currencySymbol: '฿', language: 'Thai, English', timezone: 'GMT+7', lat: 15.87, lng: 100.9925, desc: 'Land of Smiles featuring golden Buddhist temples, tropical islands, and world-renowned street food.' },
-  SAU: { name: 'Saudi Arabia', flag: '🇸🇦', capital: 'Riyadh', currency: 'SAR', currencySymbol: 'SAR', language: 'Arabic', timezone: 'GMT+3', lat: 23.8859, lng: 45.0792, desc: 'Historic desert kingdom of ancient Nabataean AlUla and futuristic mega-projects.' },
-  CHE: { name: 'Switzerland', flag: '🇨🇭', capital: 'Bern', currency: 'CHF', currencySymbol: 'CHF', language: 'German, French, Italian', timezone: 'GMT+1', lat: 46.8182, lng: 8.2275, desc: 'Alpine wonderland of snow-capped peaks, scenic mountain trains, and pristine lakes.' },
-  KOR: { name: 'South Korea', flag: '🇰🇷', capital: 'Seoul', currency: 'KRW', currencySymbol: '₩', language: 'Korean', timezone: 'GMT+9', lat: 35.9078, lng: 127.7669, desc: 'Dynamic peninsula of high-tech vibrancy, K-Culture, historic palaces, and mountain trails.' },
-  ZAF: { name: 'South Africa', flag: '🇿🇦', capital: 'Pretoria', currency: 'ZAR', currencySymbol: 'R', language: 'English, Zulu, Afrikaans', timezone: 'GMT+2', lat: -30.5595, lng: 22.9375, desc: 'Rainbow nation with iconic Table Mountain, Cape wine lands, and Big Five safari game reserves.' }
+  NER: { name: 'Niger', flag: '🇳🇪', capital: 'Niamey', currency: 'XOF', currencySymbol: 'CFA', language: 'French, Hausa', timezone: 'UTC+1', population: '26.2M', callingCode: '+227', region: 'Africa · Western Africa', lat: 17.6078, lng: 8.0817, desc: 'Sahelian oasis of desert caravans and clay architecture in West Africa.' },
+  FRA: { name: 'France', flag: '🇫🇷', capital: 'Paris', currency: 'EUR', currencySymbol: '€', language: 'French', timezone: 'UTC+1', population: '68.2M', callingCode: '+33', region: 'Europe · Western Europe', lat: 46.2276, lng: 2.2137, desc: 'World leader in art, culinary excellence, wine, and romantic landmarks.' },
+  UZB: { name: 'Uzbekistan', flag: '🇺🇿', capital: 'Tashkent', currency: 'UZS', currencySymbol: 'soʻm', language: 'Uzbek', timezone: 'UTC+5', population: '36.0M', callingCode: '+998', region: 'Asia · Central Asia', lat: 41.3775, lng: 64.5853, desc: 'Legendary Silk Road crossroads with turquoise domes and ancient bazaars.' },
+  TUR: { name: 'Turkey', flag: '🇹🇷', capital: 'Ankara', currency: 'TRY', currencySymbol: '₺', language: 'Turkish', timezone: 'UTC+3', population: '85.3M', callingCode: '+90', region: 'Europe / Asia · Middle East', lat: 38.9637, lng: 35.2433, desc: 'Transcontinental bridge of Byzantine and Ottoman history and scenic coasts.' },
+  JPN: { name: 'Japan', flag: '🇯🇵', capital: 'Tokyo', currency: 'JPY', currencySymbol: '¥', language: 'Japanese', timezone: 'UTC+9', population: '125.8M', callingCode: '+81', region: 'Asia · Eastern Asia', lat: 36.2048, lng: 138.2529, desc: 'Land of the Rising Sun blending ancient shrines and ultra-modern innovation.' },
+  USA: { name: 'United States', flag: '🇺🇸', capital: 'Washington, D.C.', currency: 'USD', currencySymbol: '$', language: 'English', timezone: 'UTC-5', population: '335.0M', callingCode: '+1', region: 'Americas · North America', lat: 37.0902, lng: -95.7129, desc: 'Expansive continent-spanning nation of world-class cities and majestic national parks.' },
+  EGY: { name: 'Egypt', flag: '🇪🇬', capital: 'Cairo', currency: 'EGP', currencySymbol: 'E£', language: 'Arabic', timezone: 'UTC+2', population: '110.9M', callingCode: '+20', region: 'Africa · North Africa', lat: 26.8206, lng: 30.8025, desc: 'Millennia of pharaonic wonders, Nile river journeys, and vibrant bazaars.' },
+  ARE: { name: 'United Arab Emirates', flag: '🇦🇪', capital: 'Abu Dhabi', currency: 'AED', currencySymbol: 'AED', language: 'Arabic', timezone: 'UTC+4', population: '9.9M', callingCode: '+971', region: 'Asia · Middle East', lat: 23.4241, lng: 53.8478, desc: 'Futuristic desert oasis with gleaming skyscrapers and luxury hospitality.' },
+  ITA: { name: 'Italy', flag: '🇮🇹', capital: 'Rome', currency: 'EUR', currencySymbol: '€', language: 'Italian', timezone: 'UTC+1', population: '59.0M', callingCode: '+39', region: 'Europe · Southern Europe', lat: 41.8719, lng: 12.5674, desc: 'Cradle of ancient Rome, Renaissance art, Tuscan vineyards, and Mediterranean cuisine.' },
+  DEU: { name: 'Germany', flag: '🇩🇪', capital: 'Berlin', currency: 'EUR', currencySymbol: '€', language: 'German', timezone: 'UTC+1', population: '84.4M', callingCode: '+49', region: 'Europe · Western Europe', lat: 51.1657, lng: 10.4515, desc: 'Heart of central Europe known for castles, Rhine valleys, and cultural vitality.' },
+  BRA: { name: 'Brazil', flag: '🇧🇷', capital: 'Brasília', currency: 'BRL', currencySymbol: 'R$', language: 'Portuguese', timezone: 'UTC-3', population: '215.3M', callingCode: '+55', region: 'Americas · South America', lat: -14.235, lng: -51.9253, desc: 'South America vibrant giant of Amazon rainforests and sun-soaked Atlantic coasts.' },
+  GBR: { name: 'United Kingdom', flag: '🇬🇧', capital: 'London', currency: 'GBP', currencySymbol: '£', language: 'English', timezone: 'UTC+0', population: '67.7M', callingCode: '+44', region: 'Europe · Northern Europe', lat: 55.3781, lng: -3.436, desc: 'Rich historic kingdom of royal palaces, lush countryside, and global culture.' },
+  IND: { name: 'India', flag: '🇮🇳', capital: 'New Delhi', currency: 'INR', currencySymbol: '₹', language: 'Hindi, English', timezone: 'UTC+5:30', population: '1.43B', callingCode: '+91', region: 'Asia · Southern Asia', lat: 20.5937, lng: 78.9629, desc: 'Vibrant subcontinent of timeless temples, rich spices, and royal Rajasthani forts.' },
+  CHN: { name: 'China', flag: '🇨🇳', capital: 'Beijing', currency: 'CNY', currencySymbol: '¥', language: 'Mandarin', timezone: 'UTC+8', population: '1.41B', callingCode: '+86', region: 'Asia · Eastern Asia', lat: 35.8617, lng: 104.1954, desc: 'Ancient civilization of the Great Wall, Silk Road heritage, and energetic modern megacities.' },
+  ESP: { name: 'Spain', flag: '🇪🇸', capital: 'Madrid', currency: 'EUR', currencySymbol: '€', language: 'Spanish', timezone: 'UTC+1', population: '47.6M', callingCode: '+34', region: 'Europe · Southern Europe', lat: 40.4637, lng: -3.7492, desc: 'Sun-drenched Mediterranean realm of flamenco, tapas, and Gaudí architecture.' },
+  AUS: { name: 'Australia', flag: '🇦🇺', capital: 'Canberra', currency: 'AUD', currencySymbol: 'A$', language: 'English', timezone: 'UTC+10', population: '26.0M', callingCode: '+61', region: 'Oceania · Australasia', lat: -25.2744, lng: 133.7751, desc: 'Island continent of Great Barrier Reef wonders, golden surf beaches, and the Outback.' },
+  CAN: { name: 'Canada', flag: '🇨🇦', capital: 'Ottawa', currency: 'CAD', currencySymbol: 'C$', language: 'English, French', timezone: 'UTC-5', population: '38.9M', callingCode: '+1', region: 'Americas · North America', lat: 56.1304, lng: -106.3468, desc: 'Vast wilderness of turquoise glacial lakes, Rocky Mountains, and multicultural cities.' },
+  MAR: { name: 'Morocco', flag: '🇲🇦', capital: 'Rabat', currency: 'MAD', currencySymbol: 'MAD', language: 'Arabic, French', timezone: 'UTC+1', population: '37.8M', callingCode: '+212', region: 'Africa · North Africa', lat: 31.7917, lng: -7.0926, desc: 'Imperial kingdoms with labyrinthine medinas, Atlas peaks, and fragrant spice souks.' },
+  THA: { name: 'Thailand', flag: '🇹🇭', capital: 'Bangkok', currency: 'THB', currencySymbol: '฿', language: 'Thai, English', timezone: 'UTC+7', population: '71.8M', callingCode: '+66', region: 'Asia · South-Eastern Asia', lat: 15.87, lng: 100.9925, desc: 'Land of Smiles featuring golden Buddhist temples, tropical islands, and world-renowned street food.' },
+  SAU: { name: 'Saudi Arabia', flag: '🇸🇦', capital: 'Riyadh', currency: 'SAR', currencySymbol: 'SAR', language: 'Arabic', timezone: 'UTC+3', population: '36.4M', callingCode: '+966', region: 'Asia · Middle East', lat: 23.8859, lng: 45.0792, desc: 'Historic desert kingdom of ancient Nabataean AlUla and futuristic mega-projects.' },
+  CHE: { name: 'Switzerland', flag: '🇨🇭', capital: 'Bern', currency: 'CHF', currencySymbol: 'CHF', language: 'German, French, Italian', timezone: 'UTC+1', population: '8.8M', callingCode: '+41', region: 'Europe · Western Europe', lat: 46.8182, lng: 8.2275, desc: 'Alpine wonderland of snow-capped peaks, scenic mountain trains, and pristine lakes.' },
+  KOR: { name: 'South Korea', flag: '🇰🇷', capital: 'Seoul', currency: 'KRW', currencySymbol: '₩', language: 'Korean', timezone: 'UTC+9', population: '51.7M', callingCode: '+82', region: 'Asia · Eastern Asia', lat: 35.9078, lng: 127.7669, desc: 'Dynamic peninsula of high-tech vibrancy, K-Culture, historic palaces, and mountain trails.' },
+  ZAF: { name: 'South Africa', flag: '🇿🇦', capital: 'Pretoria', currency: 'ZAR', currencySymbol: 'R', language: 'English, Zulu, Afrikaans', timezone: 'UTC+2', population: '60.6M', callingCode: '+27', region: 'Africa · Southern Africa', lat: -30.5595, lng: 22.9375, desc: 'Rainbow nation with iconic Table Mountain, Cape wine lands, and Big Five safari game reserves.' }
 };
 
 /**
@@ -690,7 +697,10 @@ export function generateDestinationForCountry(countryName: string, isoCode?: str
   const currency = meta?.currency || 'USD';
   const currencySymbol = meta?.currencySymbol || '$';
   const language = meta?.language || 'Local Language, English';
-  const timezone = meta?.timezone || 'GMT+0';
+  const timezone = meta?.timezone || 'UTC+0';
+  const population = meta?.population || 'Verified Population';
+  const callingCode = meta?.callingCode || '+0';
+  const region = meta?.region || 'Global Destination';
   const latitude = lat ?? meta?.lat ?? 20.0;
   const longitude = lng ?? meta?.lng ?? 0.0;
 
@@ -703,6 +713,9 @@ export function generateDestinationForCountry(countryName: string, isoCode?: str
     lng: longitude,
     type: 'country',
     capital,
+    population,
+    callingCode,
+    region,
     currency,
     currencySymbol,
     language,

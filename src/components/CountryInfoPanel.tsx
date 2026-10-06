@@ -1,11 +1,8 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
 import { 
   X, Heart, CloudSun, Sun, CloudRain, Cloud, Sparkles, 
-  MapPin, Globe, Languages, DollarSign, Clock, ShieldCheck, 
-  Building2, Utensils, Compass, Star, ChevronRight, ArrowRight 
+  Globe, Compass
 } from '../icons';
-import { useTranslation } from '../context/LanguageContext';
 import { type DestinationItem, resolveDestination, generateDestinationForCountry } from '../services/destinationCatalog';
 
 export interface CountryData {
@@ -15,6 +12,8 @@ export interface CountryData {
   currency: string;
   timezone: string;
   population?: string;
+  callingCode?: string;
+  region?: string;
   area?: string;
   flag: string;
   weather?: {
@@ -39,6 +38,7 @@ interface CountryInfoPanelProps {
   country: DestinationItem | CountryData | { properties: { NAME: string; [key: string]: any } } | null;
   onClose?: () => void;
   onCreateTrip?: (destination: any) => void;
+  onExploreDestination?: (destination: any) => void;
   inline?: boolean;
   embedded?: boolean;
 }
@@ -47,14 +47,37 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({
   country, 
   onClose, 
   onCreateTrip, 
+  onExploreDestination,
   inline = false,
   embedded = false 
 }) => {
-  const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<'overview' | 'places' | 'hotels' | 'food' | 'tours'>('overview');
   const [isSaved, setIsSaved] = useState(false);
 
-  if (!country) return null;
+  if (!country) {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100%',
+        padding: '32px',
+        textAlign: 'center',
+        color: 'var(--text-secondary, #94A3B8)',
+        background: 'var(--bg-surface, #101E32)',
+        borderRadius: inline ? '16px' : '0',
+        border: '1px solid var(--border, rgba(255,255,255,0.08))'
+      }}>
+        <Globe size={36} style={{ color: 'var(--accent, #3B82F6)', marginBottom: '12px', opacity: 0.8 }} />
+        <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary, #F8FAFC)' }}>
+          Select a Country
+        </h4>
+        <p style={{ margin: '6px 0 0 0', fontSize: '0.78rem', color: 'var(--text-secondary, #94A3B8)', maxWidth: '220px' }}>
+          Interact with the 3D globe to inspect live travel telemetry, visa rules, and destinations.
+        </p>
+      </div>
+    );
+  }
 
   // Resolve into normalized data structure
   let item: DestinationItem | null = null;
@@ -62,7 +85,7 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({
 
   if ((country as any).places && (country as any).countryCode) {
     item = country as DestinationItem;
-    countryName = item.country;
+    countryName = item.country || item.name;
   } else if ((country as any).properties?.NAME) {
     countryName = (country as any).properties.NAME;
     item = resolveDestination(countryName, (country as any).properties);
@@ -78,23 +101,21 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({
     item = generateDestinationForCountry(countryName);
   }
 
-  // Fallback metadata
-  const name = item ? item.name : countryName || 'Destination';
-  const capital = item?.capital || (country as any)?.capital || `${name} Capital`;
+  // Fallback metadata extracted cleanly
+  const name = (item ? item.name : countryName || 'Destination').toUpperCase();
+  const rawName = item ? item.name : countryName || 'Destination';
+  const capital = item?.capital || (country as any)?.capital || `${rawName} Capital`;
   const currency = item?.currency || (country as any)?.currency || 'USD';
-  const currencySymbol = item?.currencySymbol || '$';
   const language = item?.language || (country as any)?.language || 'Local Language';
-  const timezone = item?.timezone || (country as any)?.timezone || 'GMT+0';
+  const timezone = item?.timezone || (country as any)?.timezone || 'UTC+0';
+  const population = item?.population || (country as any)?.population || ((country as any)?.properties?.POP_EST ? `${((country as any).properties.POP_EST / 1000000).toFixed(1)}M` : 'Verified');
+  const callingCode = item?.callingCode || (country as any)?.callingCode || '+33';
+  const region = item?.region || (country as any)?.region || ((country as any)?.properties?.CONTINENT ? `${(country as any).properties.CONTINENT} · ${(country as any).properties.SUBREGION || ''}`.trim() : 'Global Region');
   const flag = item?.flag || (country as any)?.flag || '🌍';
-  const description = item?.description || (country as any)?.description || `Discover the cultural heritage, remarkable sights, and authentic travel experiences of ${name}.`;
-  const weather = item?.weather ? { temp: item.weather.tempC, condition: item.weather.condition } : (country as any)?.weather || { temp: 24, condition: 'Sunny' };
-  const bestSeason = item?.bestSeason || (country as any)?.bestTime || 'Spring & Autumn';
-  const visaVerified = item?.visaVerified || { status: 'Visa Free', summary: `Standard travel entry for visiting ${name}.` };
-  const places = item?.places || [];
-  const hotels = item?.hotels || [];
-  const restaurants = item?.restaurants || [];
-  const tours = item?.tours || [];
-  const popularDestinations = item?.popularDestinations || [];
+  const weather = item?.weather ? { temp: item.weather.tempC, condition: item.weather.condition } : (country as any)?.weather || { temp: 22, condition: 'Partly cloudy' };
+  const popularDestinations = item?.popularDestinations || [
+    { name: capital, region: 'Capital District', image: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=400&q=80' }
+  ];
 
   // Hero Cover Image
   const heroImage = item?.popularDestinations?.[0]?.image || 
@@ -102,116 +123,125 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({
                     'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=800&q=80';
 
   const getWeatherIcon = (condition?: string) => {
-    if (!condition) return <CloudSun size={16} style={{ color: '#f59e0b' }} />;
+    if (!condition) return <CloudSun size={18} style={{ color: '#60A5FA' }} />;
     const c = condition.toLowerCase();
-    if (c.includes('sun') || c.includes('clear')) return <Sun size={16} style={{ color: '#f59e0b' }} />;
-    if (c.includes('rain')) return <CloudRain size={16} style={{ color: '#3b82f6' }} />;
-    if (c.includes('cloud')) return <Cloud size={16} style={{ color: '#64748b' }} />;
-    return <CloudSun size={16} style={{ color: '#f59e0b' }} />;
+    if (c.includes('sun') || c.includes('clear')) return <Sun size={18} style={{ color: '#F59E0B' }} />;
+    if (c.includes('rain')) return <CloudRain size={18} style={{ color: '#3B82F6' }} />;
+    if (c.includes('cloud')) return <Cloud size={18} style={{ color: '#94A3B8' }} />;
+    return <CloudSun size={18} style={{ color: '#60A5FA' }} />;
   };
 
   const handleStartPlanning = () => {
     if (onCreateTrip) {
-      onCreateTrip(item || { name, id: name.toLowerCase() });
+      onCreateTrip(item || { name: rawName, id: rawName.toLowerCase() });
+    }
+  };
+
+  const handleExplore = () => {
+    if (onExploreDestination) {
+      onExploreDestination(item || { name: rawName, id: rawName.toLowerCase() });
+    } else if (onCreateTrip) {
+      onCreateTrip(item || { name: rawName, id: rawName.toLowerCase() });
     }
   };
 
   const isInline = inline || embedded;
 
-  const panelContent = (
+  return (
     <div style={{
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
       width: '100%',
-      background: 'var(--color-bg-surface, #ffffff)',
-      color: 'var(--color-text-primary, #0f172a)',
-      borderRadius: isInline ? '20px' : '0',
+      background: 'var(--bg-surface, #101E32)',
+      color: 'var(--text-primary, #F8FAFC)',
+      borderRadius: isInline ? '16px' : '0',
+      border: isInline ? '1px solid var(--border, rgba(255,255,255,0.08))' : 'none',
       overflow: 'hidden',
-      position: 'relative'
+      position: 'relative',
+      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)'
     }}>
-      {/* 1. HERO PHOTO HEADER */}
+      {/* 1. HEADER SECTION */}
       <div style={{
         position: 'relative',
-        height: '175px',
+        height: '140px',
         width: '100%',
         flexShrink: 0,
         overflow: 'hidden'
       }}>
         <img
           src={heroImage}
-          alt={name}
+          alt={rawName}
           style={{
             width: '100%',
             height: '100%',
             objectFit: 'cover'
           }}
         />
-        {/* Dark Gradient Overlay */}
+        {/* Dark Navy Gradient Overlay */}
         <div style={{
           position: 'absolute',
           inset: 0,
-          background: 'linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.72) 100%)'
+          background: 'linear-gradient(180deg, rgba(7, 17, 31, 0.3) 0%, rgba(16, 30, 50, 0.95) 100%)'
         }} />
 
-        {/* Top-Right Action Buttons: Favorite & Close */}
+        {/* Top-Right Favorite & Close */}
         <div style={{
           position: 'absolute',
-          top: '12px',
-          right: '12px',
+          top: '10px',
+          right: '10px',
           display: 'flex',
-          gap: '8px',
+          gap: '6px',
           zIndex: 10
         }}>
           <button
             onClick={() => setIsSaved(!isSaved)}
             style={{
-              width: '32px',
-              height: '32px',
+              width: '30px',
+              height: '30px',
               borderRadius: '50%',
-              background: 'rgba(15, 23, 42, 0.65)',
+              background: 'rgba(7, 17, 31, 0.7)',
               backdropFilter: 'blur(8px)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              color: isSaved ? '#ef4444' : '#ffffff',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              color: isSaved ? '#EF4444' : '#F8FAFC',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              transition: 'all 0.2s'
+              transition: 'all 0.15s ease'
             }}
-            title={isSaved ? 'Saved to Favorites' : 'Save Destination'}
+            title={isSaved ? 'Saved' : 'Save Country'}
           >
-            <Heart size={15} fill={isSaved ? '#ef4444' : 'none'} />
+            <Heart size={14} fill={isSaved ? '#EF4444' : 'none'} />
           </button>
 
           {!isInline && onClose && (
             <button
               onClick={onClose}
               style={{
-                width: '32px',
-                height: '32px',
+                width: '30px',
+                height: '30px',
                 borderRadius: '50%',
-                background: 'rgba(15, 23, 42, 0.65)',
+                background: 'rgba(7, 17, 31, 0.7)',
                 backdropFilter: 'blur(8px)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                color: '#ffffff',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                color: '#F8FAFC',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
+                cursor: 'pointer'
               }}
               title="Close panel"
             >
-              <X size={15} />
+              <X size={14} />
             </button>
           )}
         </div>
 
-        {/* Hero Title & Flag Badge */}
+        {/* Country Title & Region */}
         <div style={{
           position: 'absolute',
-          bottom: '12px',
+          bottom: '10px',
           left: '16px',
           right: '16px',
           display: 'flex',
@@ -221,441 +251,263 @@ export const CountryInfoPanel: React.FC<CountryInfoPanelProps> = ({
         }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '1.4rem' }}>{flag}</span>
+              <span style={{ fontSize: '1.25rem' }}>{flag}</span>
               <h2 style={{
-                fontSize: '1.45rem',
+                fontSize: '1.25rem',
                 fontWeight: 900,
-                color: '#ffffff',
+                color: '#F8FAFC',
                 margin: 0,
-                fontFamily: "'Outfit', sans-serif",
-                lineHeight: 1.15
+                letterSpacing: '0.5px',
+                fontFamily: "'Outfit', sans-serif"
               }}>
                 {name}
               </h2>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
-              <MapPin size={11} style={{ color: '#38bdf8' }} />
-              <span style={{ fontSize: '0.72rem', color: '#e2e8f0', fontWeight: 600 }}>
-                {capital} • {currency} ({currencySymbol}) • {language.split(',')[0]}
-              </span>
+            <div style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: '2px', fontWeight: 600 }}>
+              {capital} • {region}
             </div>
           </div>
 
-          <button
-            onClick={handleStartPlanning}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '100px',
-              background: '#2563eb',
-              color: '#ffffff',
-              border: 'none',
+          <div style={{ textAlign: 'right' }}>
+            <span style={{
               fontSize: '0.72rem',
               fontWeight: 800,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              boxShadow: '0 2px 10px rgba(37,99,235,0.4)',
-              flexShrink: 0
-            }}
-          >
-            <Sparkles size={12} />
-            <span>AI Plan</span>
-          </button>
+              color: '#60A5FA',
+              background: 'rgba(59, 130, 246, 0.15)',
+              padding: '3px 8px',
+              borderRadius: '6px',
+              border: '1px solid rgba(59, 130, 246, 0.25)'
+            }}>
+              {currency} • {callingCode}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* 2. TAB NAVIGATION BAR */}
-      <div style={{
-        display: 'flex',
-        borderBottom: '1px solid var(--border, rgba(15, 23, 42, 0.08))',
-        background: 'var(--color-bg-surface, #ffffff)',
-        padding: '6px 12px',
-        gap: '4px',
-        overflowX: 'auto',
-        flexShrink: 0
-      }}>
-        {(['overview', 'places', 'hotels', 'food', 'tours'] as const).map(tab => {
-          const isActive = activeTab === tab;
-          return (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '100px',
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                border: isActive ? '1px solid var(--color-accent, #2563eb)' : '1px solid transparent',
-                background: isActive ? 'var(--color-accent, #2563eb)' : 'transparent',
-                color: isActive ? '#ffffff' : 'var(--color-text-secondary, #64748b)',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                textTransform: 'capitalize'
-              }}
-            >
-              {tab === 'food' ? 'Food' : tab}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* 3. SCROLLABLE TAB CONTENT */}
+      {/* 2. SCROLLABLE BODY */}
       <div style={{
         flex: 1,
         overflowY: 'auto',
-        padding: '16px',
+        padding: '14px 16px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '14px'
+        gap: '12px'
       }}>
-        {/* TAB 1: OVERVIEW */}
-        {activeTab === 'overview' && (
-          <>
-            {/* Description Paragraph */}
-            <p style={{
-              margin: 0,
-              fontSize: '0.82rem',
-              color: 'var(--color-text-secondary, #475569)',
-              lineHeight: 1.55,
-              fontWeight: 500
-            }}>
-              {description}
-            </p>
+        {/* Country Key Facts 4-Grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, 1fr)',
+          gap: '8px',
+          background: 'var(--bg-secondary, #0B1728)',
+          padding: '10px 12px',
+          borderRadius: '12px',
+          border: '1px solid var(--border, rgba(255,255,255,0.08))'
+        }}>
+          <div>
+            <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary, #94A3B8)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block' }}>
+              Capital
+            </span>
+            <strong style={{ fontSize: '0.82rem', color: 'var(--text-primary, #F8FAFC)', fontWeight: 700 }}>
+              {capital}
+            </strong>
+          </div>
+          <div>
+            <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary, #94A3B8)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block' }}>
+              Population
+            </span>
+            <strong style={{ fontSize: '0.82rem', color: 'var(--text-primary, #F8FAFC)', fontWeight: 700 }}>
+              {population}
+            </strong>
+          </div>
+          <div>
+            <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary, #94A3B8)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block' }}>
+              Language
+            </span>
+            <strong style={{ fontSize: '0.82rem', color: 'var(--text-primary, #F8FAFC)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
+              {language.split(',')[0]}
+            </strong>
+          </div>
+          <div>
+            <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary, #94A3B8)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block' }}>
+              Timezone
+            </span>
+            <strong style={{ fontSize: '0.82rem', color: 'var(--text-primary, #F8FAFC)', fontWeight: 700 }}>
+              {timezone}
+            </strong>
+          </div>
+        </div>
 
-            {/* 3 Telemetry Pill Cards (Weather, Best Season, Visa) */}
+        {/* Mini Weather Card Abstraction */}
+        <div style={{
+          background: 'var(--bg-secondary, #0B1728)',
+          border: '1px solid var(--border, rgba(255,255,255,0.08))',
+          borderRadius: '12px',
+          padding: '10px 14px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '8px'
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
+              background: 'rgba(59, 130, 246, 0.12)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}>
-              {/* Weather Pill */}
-              <div style={{
-                background: 'var(--bg-secondary, #f8fafc)',
-                border: '1px solid var(--border, rgba(15,23,42,0.08))',
-                borderRadius: '12px',
-                padding: '8px 10px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '2px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  {getWeatherIcon(weather?.condition)}
-                  <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--color-text-primary, #0f172a)' }}>
-                    {weather?.temp || 24}°C
-                  </span>
-                </div>
-                <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted, #64748b)' }}>
-                  {weather?.condition || 'Current'}
-                </span>
+              {getWeatherIcon(weather?.condition)}
+            </div>
+            <div>
+              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary, #F8FAFC)' }}>
+                {capital}
               </div>
-
-              {/* Season Pill */}
-              <div style={{
-                background: 'var(--bg-secondary, #f8fafc)',
-                border: '1px solid var(--border, rgba(15,23,42,0.08))',
-                borderRadius: '12px',
-                padding: '8px 10px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '2px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <Compass size={14} style={{ color: '#2563eb' }} />
-                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--color-text-primary, #0f172a)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {bestSeason.split('(')[0].trim()}
-                  </span>
-                </div>
-                <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted, #64748b)' }}>
-                  Best Season
-                </span>
-              </div>
-
-              {/* Visa Pill */}
-              <div style={{
-                background: 'var(--bg-secondary, #f8fafc)',
-                border: '1px solid var(--border, rgba(15,23,42,0.08))',
-                borderRadius: '12px',
-                padding: '8px 10px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '2px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <ShieldCheck size={14} style={{ color: '#10b981' }} />
-                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#10b981', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {visaVerified?.status || 'Visa Free'}
-                  </span>
-                </div>
-                <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted, #64748b)' }}>
-                  Entry status
-                </span>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary, #94A3B8)' }}>
+                {weather?.condition || 'Partly cloudy'}
               </div>
             </div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--text-primary, #F8FAFC)', fontFamily: "'Outfit', sans-serif" }}>
+              {weather?.temp || 22}°C
+            </span>
+            <span style={{ display: 'block', fontSize: '0.62rem', color: '#60A5FA', fontWeight: 700 }}>
+              Live Forecast
+            </span>
+          </div>
+        </div>
 
-            {/* Popular Destinations Mini Cards */}
-            {popularDestinations.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted, #64748b)', textTransform: 'uppercase' }}>
-                  Popular Highlights in {name}
-                </span>
+        {/* Popular Destinations List */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-secondary, #94A3B8)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Popular Destinations
+            </span>
+            <span style={{ fontSize: '0.65rem', color: '#60A5FA', fontWeight: 700 }}>
+              {popularDestinations.length} Hubs
+            </span>
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '6px'
+          }}>
+            {popularDestinations.slice(0, 3).map((dest, i) => (
+              <div
+                key={i}
+                onClick={handleExplore}
+                style={{
+                  borderRadius: '10px',
+                  overflow: 'hidden',
+                  position: 'relative',
+                  height: '74px',
+                  cursor: 'pointer',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  transition: 'transform 0.15s ease'
+                }}
+              >
+                <img
+                  src={dest.image}
+                  alt={dest.name}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
                 <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(3, 1fr)',
-                  gap: '8px'
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(180deg, transparent 30%, rgba(7, 17, 31, 0.9) 100%)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'flex-end',
+                  padding: '5px 6px'
                 }}>
-                  {popularDestinations.map((dest, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        borderRadius: '12px',
-                        overflow: 'hidden',
-                        position: 'relative',
-                        height: '80px',
-                        cursor: 'pointer',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.08)'
-                      }}
-                      onClick={() => handleStartPlanning()}
-                    >
-                      <img
-                        src={dest.image}
-                        alt={dest.name}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                      <div style={{
-                        position: 'absolute',
-                        inset: 0,
-                        background: 'linear-gradient(180deg, transparent 20%, rgba(0,0,0,0.8) 100%)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'flex-end',
-                        padding: '6px'
-                      }}>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ffffff', lineHeight: 1.1 }}>
-                          {dest.name}
-                        </span>
-                        <span style={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.8)' }}>
-                          {dest.region || 'Top Destination'}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* TAB 2: PLACES */}
-        {activeTab === 'places' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {places.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-muted)' }}>
-                No places listed for {name}
-              </div>
-            ) : (
-              places.map((place, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    background: 'var(--bg-secondary, #f8fafc)',
-                    border: '1px solid var(--border, rgba(15,23,42,0.08))',
-                    borderRadius: '12px',
-                    padding: '10px 12px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}
-                >
-                  <div>
-                    <strong style={{ fontSize: '0.85rem', color: 'var(--color-text-primary, #0f172a)', display: 'block' }}>
-                      {place.name}
-                    </strong>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted, #64748b)' }}>
-                      {place.category} • {place.entryFeeUSD === 0 ? 'Free Entry' : `$${place.entryFeeUSD}`}
-                    </span>
-                  </div>
-                  <span style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '2px' }}>
-                    <Star size={11} fill="#f59e0b" stroke="none" /> {place.rating}
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#F8FAFC', lineHeight: 1.1 }}>
+                    {dest.name}
                   </span>
                 </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {/* TAB 3: TOURS */}
-        {activeTab === 'tours' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {tours.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-muted)' }}>
-                No ready tours listed for {name}
               </div>
-            ) : (
-              tours.map((tour, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    background: 'var(--bg-secondary, #f8fafc)',
-                    border: '1px solid var(--border, rgba(15,23,42,0.08))',
-                    borderRadius: '12px',
-                    padding: '10px 12px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}
-                >
-                  <div>
-                    <strong style={{ fontSize: '0.82rem', color: 'var(--color-text-primary, #0f172a)', display: 'block' }}>
-                      {tour.title}
-                    </strong>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted, #64748b)' }}>
-                      {tour.agencyName} • {tour.durationDays} Days
-                    </span>
-                  </div>
-                  <strong style={{ fontSize: '0.9rem', color: '#10b981' }}>
-                    ${tour.priceUSD}
-                  </strong>
-                </div>
-              ))
-            )}
+            ))}
           </div>
-        )}
-
-        {/* TAB 4: HOTELS */}
-        {activeTab === 'hotels' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {hotels.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-muted)' }}>
-                No hotel listings found for {name}
-              </div>
-            ) : (
-              hotels.map((hotel, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    background: 'var(--bg-secondary, #f8fafc)',
-                    border: '1px solid var(--border, rgba(15,23,42,0.08))',
-                    borderRadius: '12px',
-                    padding: '10px 12px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}
-                >
-                  <div>
-                    <strong style={{ fontSize: '0.85rem', color: 'var(--color-text-primary, #0f172a)', display: 'block' }}>
-                      {hotel.name}
-                    </strong>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted, #64748b)' }}>
-                      {hotel.type} • {hotel.stars}★
-                    </span>
-                  </div>
-                  <strong style={{ fontSize: '0.88rem', color: '#10b981' }}>
-                    ${hotel.pricePerNightUSD}/night
-                  </strong>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {/* TAB 5: FOOD */}
-        {activeTab === 'food' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {restaurants.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-muted)' }}>
-                No culinary recommendations listed for {name}
-              </div>
-            ) : (
-              restaurants.map((rest, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    background: 'var(--bg-secondary, #f8fafc)',
-                    border: '1px solid var(--border, rgba(15,23,42,0.08))',
-                    borderRadius: '12px',
-                    padding: '10px 12px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}
-                >
-                  <div>
-                    <strong style={{ fontSize: '0.85rem', color: 'var(--color-text-primary, #0f172a)', display: 'block' }}>
-                      {rest.name}
-                    </strong>
-                    <span style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 600 }}>
-                      Specialty: {rest.specialty}
-                    </span>
-                  </div>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--color-accent, #2563eb)', fontWeight: 800 }}>
-                    {rest.priceRange}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        )}
+        </div>
       </div>
 
-      {/* 4. PRIMARY ACTION BUTTON: Explore [Destination] */}
+      {/* 3. BOTTOM ACTION BUTTONS */}
       <div style={{
         padding: '12px 16px',
-        borderTop: '1px solid var(--glass-border, rgba(15,23,42,0.08))',
-        background: 'var(--color-bg-surface, #ffffff)',
-        flexShrink: 0
+        borderTop: '1px solid var(--border, rgba(255,255,255,0.08))',
+        background: 'var(--bg-secondary, #0B1728)',
+        display: 'grid',
+        gridTemplateColumns: '1.2fr 1.2fr 0.8fr',
+        gap: '8px'
       }}>
         <button
-          onClick={handleStartPlanning}
+          onClick={handleExplore}
           style={{
-            width: '100%',
-            padding: '11px',
-            borderRadius: '12px',
-            background: '#2563eb',
-            color: '#ffffff',
+            padding: '8px 10px',
+            borderRadius: '10px',
+            background: 'var(--bg-surface, #101E32)',
+            color: 'var(--text-primary, #F8FAFC)',
+            border: '1px solid var(--border, rgba(255,255,255,0.12))',
+            fontSize: '0.72rem',
             fontWeight: 800,
-            fontSize: '0.85rem',
-            border: 'none',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '8px',
-            boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
-            transition: 'background 0.2s'
+            gap: '4px',
+            transition: 'background 0.15s ease'
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-surface-hover, #15263D)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-surface, #101E32)')}
+        >
+          <Compass size={13} style={{ color: '#60A5FA' }} />
+          <span>Explore</span>
+        </button>
+
+        <button
+          onClick={handleStartPlanning}
+          style={{
+            padding: '8px 10px',
+            borderRadius: '10px',
+            background: 'linear-gradient(135deg, #3B82F6, #2563EB)',
+            color: '#FFFFFF',
+            border: 'none',
+            fontSize: '0.72rem',
+            fontWeight: 800,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '4px',
+            boxShadow: '0 2px 10px rgba(59, 130, 246, 0.35)'
           }}
         >
-          <span>Explore {name}</span>
-          <ArrowRight size={15} />
+          <Sparkles size={13} />
+          <span>Plan a trip</span>
+        </button>
+
+        <button
+          onClick={() => setIsSaved(!isSaved)}
+          style={{
+            padding: '8px 8px',
+            borderRadius: '10px',
+            background: isSaved ? 'rgba(239, 68, 68, 0.15)' : 'var(--bg-surface, #101E32)',
+            color: isSaved ? '#EF4444' : 'var(--text-secondary, #94A3B8)',
+            border: isSaved ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid var(--border, rgba(255,255,255,0.12))',
+            fontSize: '0.72rem',
+            fontWeight: 800,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '4px'
+          }}
+        >
+          <Heart size={13} fill={isSaved ? '#EF4444' : 'none'} />
+          <span>{isSaved ? 'Saved' : 'Save'}</span>
         </button>
       </div>
     </div>
-  );
-
-  if (isInline) {
-    return panelContent;
-  }
-
-  return (
-    <motion.aside
-      initial={{ x: 380, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      exit={{ x: 380, opacity: 0 }}
-      transition={{ type: 'spring', damping: 26, stiffness: 220 }}
-      style={{
-        position: 'absolute',
-        zIndex: 500,
-        top: 0,
-        bottom: 0,
-        right: 0,
-        width: '420px',
-        maxWidth: '100%',
-        boxShadow: '-12px 0 40px rgba(0,0,0,0.25)',
-        borderLeft: '1px solid var(--glass-border, rgba(15,23,42,0.08))'
-      }}
-    >
-      {panelContent}
-    </motion.aside>
   );
 };

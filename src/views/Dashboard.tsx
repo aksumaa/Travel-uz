@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { useLanguage } from '../context/LanguageContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { Globe3D } from '../components/Globe3D';
 import { CountryInfoPanel } from '../components/CountryInfoPanel';
@@ -18,18 +16,22 @@ import { TripDetailsView } from './TripDetailsView';
 import { AdminView } from './AdminView';
 import { 
   Compass, Sparkles, Calendar, Map, Star, Heart, 
-  User, Search, Sun, Moon, Bell, X, 
+  Search, Sun, Moon, Bell, X, Globe,
   ChevronDown, Users, 
-  ArrowRight, Utensils, MapPin, Settings as SettingsIcon,
-  ChevronRight, Landmark, Plane, Tag, Luggage, Navigation,
-  MessageSquare, Shield, TrendingUp, Building2
+  ArrowRight, MapPin, Settings as SettingsIcon,
+  ChevronRight, MessageSquare, Shield, TrendingUp, Building2
 } from '../icons';
 import { CrmPipelineView } from '../components/CrmPipelineView';
 import { AgencyAnalyticsView } from '../components/AgencyAnalyticsView';
 import { TelegramSettingsView } from '../components/TelegramSettingsView';
 import { AgencyOnboardingModal } from '../components/AgencyOnboardingModal';
 import { api } from '../services/api';
-import { resolveDestination, generateDestinationForCountry } from '../services/destinationCatalog';
+import { 
+  resolveDestination, 
+  generateDestinationForCountry,
+  getDestinationSuggestions,
+  type DestinationItem
+} from '../services/destinationCatalog';
 
 interface DashboardProps {
   initialView?: string;
@@ -38,10 +40,8 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onViewChange, variant = 'user' }) => {
-  const { user, logout } = useAuth();
-  const router = useRouter();
+  const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { language, setLanguage, t } = useLanguage();
   const { currency, setCurrency, currencies, formatPrice } = useCurrency();
 
   const [activeTab, setActiveTab] = useState<string>(variant === 'admin' ? (initialView === 'home' ? 'admin' : initialView) : initialView);
@@ -51,17 +51,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
       setActiveTab(initialView);
     }
   }, [initialView]);
+
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
-  const [plannerDestination, setPlannerDestination] = useState<string>('Samarkand, Uzbekistan');
-  const [selectedCountryId, setSelectedCountryId] = useState('uzbekistan');
+  const [plannerDestination, setPlannerDestination] = useState<string>('France');
+  const [selectedCountryId, setSelectedCountryId] = useState('france');
   const [selectedFeature, setSelectedFeature] = useState<any>(null);
-  const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
   const [isCurrencyDropdownOpen, setIsCurrencyDropdownOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // Active / Upcoming trip for Live Trip Cockpit
-  const [activeTrip, setActiveTrip] = useState<any>(null);
+  // Search input and suggestions
+  const [headerSearchQuery, setHeaderSearchQuery] = useState('');
+  const [headerSuggestions, setHeaderSuggestions] = useState<DestinationItem[]>([]);
+  const [isHeaderSearchFocused, setIsHeaderSearchFocused] = useState(false);
+  const headerSearchRef = useRef<HTMLDivElement>(null);
+
+  // Recent Searches List
+  const [recentSearches, setRecentSearches] = useState<string[]>([
+    'France', 'Japan', 'Niger', 'Istanbul', 'Samarkand', 'Dubai'
+  ]);
 
   // Floating Chat states
   const [chatInput, setChatInput] = useState('');
@@ -70,37 +78,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
   ]);
   const [sending, setSending] = useState(false);
 
-  const langRef = useRef<HTMLDivElement>(null);
   const currRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns on click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (langRef.current && !langRef.current.contains(event.target as Node)) {
-        setIsLangDropdownOpen(false);
-      }
       if (currRef.current && !currRef.current.contains(event.target as Node)) {
         setIsCurrencyDropdownOpen(false);
+      }
+      if (headerSearchRef.current && !headerSearchRef.current.contains(event.target as Node)) {
+        setIsHeaderSearchFocused(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Check for active or upcoming trips in localStorage
+  // Sync suggestions when header search query changes
   useEffect(() => {
-    const aiSaved = localStorage.getItem('travel_uz_ai_trips');
-    if (aiSaved) {
-      try {
-        const list = JSON.parse(aiSaved);
-        if (list.length > 0) {
-          setActiveTrip(list[0]);
-        }
-      } catch (e) {
-        console.warn('Error reading saved trips for active cockpit');
-      }
+    if (!headerSearchQuery.trim()) {
+      setHeaderSuggestions([]);
+      return;
     }
-  }, [activeTab]);
+    const results = getDestinationSuggestions(headerSearchQuery, 5);
+    setHeaderSuggestions(results);
+  }, [headerSearchQuery]);
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -114,35 +116,41 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
     handleTabChange('planner');
   };
 
+  const handleSelectCountry = (countryKey: string) => {
+    const clean = countryKey.toLowerCase().trim();
+    setSelectedCountryId(clean);
+    
+    // Add to recent searches if not already present
+    const capitalized = countryKey.charAt(0).toUpperCase() + countryKey.slice(1);
+    setRecentSearches(prev => {
+      const filtered = prev.filter(item => item.toLowerCase() !== clean);
+      return [capitalized, ...filtered].slice(0, 6);
+    });
+  };
+
   // Mapped object representing current selected country for detail panel
   const resolvedDest = resolveDestination(selectedCountryId, selectedFeature?.properties);
-  const selectedCountryObj = resolvedDest || selectedFeature || generateDestinationForCountry(selectedCountryId || 'uzbekistan');
+  const selectedCountryObj = resolvedDest || selectedFeature || generateDestinationForCountry(selectedCountryId || 'france');
 
   interface NavItem {
     id: string;
     label: string;
     icon: React.ReactNode;
-    highlight?: boolean;
   }
 
   const userNav: NavItem[] = [
-    { id: 'home', label: t('dashboard.home') || 'Home', icon: <Compass size={17} /> },
-    { id: 'explore', label: t('dashboard.explore') || 'Explore', icon: <Map size={17} /> },
-    { id: 'planner', label: t('dashboard.planner') || 'AI Planner', icon: <Sparkles size={17} />, highlight: true },
-    { id: 'my-trips', label: t('dashboard.myTrips') || 'My Trips', icon: <Calendar size={17} /> },
-    { id: 'tours', label: t('dashboard.tours') || 'Tours', icon: <Luggage size={17} /> },
-    { id: 'saved', label: t('dashboard.saved') || 'Saved', icon: <Heart size={17} /> },
-    { id: 'community', label: t('dashboard.community') || 'Community', icon: <Users size={17} /> },
-    { id: 'profile', label: 'Profile & Preferences', icon: <User size={17} /> },
-    { id: 'settings', label: 'Settings', icon: <SettingsIcon size={17} /> },
+    { id: 'home', label: 'Explore', icon: <Compass size={18} /> },
+    { id: 'explore', label: 'Discover', icon: <Map size={18} /> },
+    { id: 'my-trips', label: 'My Trips', icon: <Calendar size={18} /> },
+    { id: 'saved', label: 'Saved', icon: <Heart size={18} /> },
   ];
 
   const adminNav: NavItem[] = [
-    { id: 'admin', label: 'Admin Console', icon: <Shield size={17} /> },
-    { id: 'crm', label: 'CRM Leads', icon: <Users size={17} /> },
-    { id: 'analytics', label: 'Agency Analytics', icon: <TrendingUp size={17} /> },
-    { id: 'telegram', label: 'Telegram Bot', icon: <MessageSquare size={17} /> },
-    { id: 'home', label: 'Traveler Dashboard', icon: <Compass size={17} /> },
+    { id: 'admin', label: 'Admin', icon: <Shield size={18} /> },
+    { id: 'crm', label: 'CRM', icon: <Users size={18} /> },
+    { id: 'analytics', label: 'Analytics', icon: <TrendingUp size={18} /> },
+    { id: 'telegram', label: 'Telegram', icon: <MessageSquare size={18} /> },
+    { id: 'home', label: 'Traveler', icon: <Compass size={18} /> },
   ];
 
   const navItems: NavItem[] = variant === 'admin' ? adminNav : userNav;
@@ -169,16 +177,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
       const itin = data.itinerary || data.raw_trip_data;
       const botText = itin?.summary || `I have mapped out verified highlights for ${userText}! Total budget estimate: ${formatPrice(itin?.totalCost || 900)}.`;
       setChatMessages([...updated, { sender: 'assistant', text: botText }]);
-    } catch (e) {
+    } catch {
       await new Promise(resolve => setTimeout(resolve, 600));
       let reply = `TripMind Copilot is tracking weather, visa rules, and heritage spots for "${userText}". Tap 'AI Planner' to generate a full customized day-by-day plan!`;
       const textLower = userText.toLowerCase();
       if (textLower.includes('weather') || textLower.includes('time')) {
-        reply = 'Spring (April-May) and Autumn (September-November) are ideal for Silk Road journeys (20-24°C).';
-      } else if (textLower.includes('visa')) {
-        reply = 'Uzbekistan grants 30-day visa-free entry to citizens of 85+ countries (EU, GCC, Americas).';
-      } else if (textLower.includes('plov') || textLower.includes('food')) {
-        reply = 'For authentic Samarkand plov, head to Osh Markazi at 12:00 sharp for fresh yellow carrot and tender lamb.';
+        reply = 'Spring and Autumn are ideal seasons across most destinations (18-24°C).';
+      } else if (textLower.includes('france') || textLower.includes('paris')) {
+        reply = 'France offers 90-day visa-free entry for EU, US, UK, and GCC citizens. Best highlights: Eiffel Tower, Louvre, and Provence.';
+      } else if (textLower.includes('niger')) {
+        reply = 'Niger features the UNESCO World Heritage Agadez Grand Mosque and rich Sahelian cultural heritage.';
       }
       setChatMessages([...updated, { sender: 'assistant', text: reply }]);
     } finally {
@@ -186,8 +194,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
     }
   };
 
+  const handleHeaderSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!headerSearchQuery.trim()) return;
+    const resolved = resolveDestination(headerSearchQuery);
+    if (resolved) {
+      handleSelectCountry(resolved.id);
+      setHeaderSearchQuery('');
+      setIsHeaderSearchFocused(false);
+    }
+  };
+
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--color-bg, #090d1a)', position: 'relative' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#07111F', color: '#F8FAFC', position: 'relative' }}>
       
       {/* Agency Onboarding Modal */}
       <AgencyOnboardingModal
@@ -196,220 +215,178 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
         onSuccess={() => alert('Agency onboarded successfully!')}
       />
 
-      {/* ==================== DESKTOP SIDEBAR ==================== */}
-      <aside className="dashboard-sidebar-panel" style={{
-        width: '240px',
-        background: 'var(--color-bg-surface, #0f172a)',
-        borderRight: '1px solid var(--glass-border, rgba(255,255,255,0.08))',
+      {/* ==================== COMPACT LEFT SIDEBAR (78px) ==================== */}
+      <aside style={{
+        width: '78px',
+        background: '#0B1728',
+        borderRight: '1px solid rgba(255, 255, 255, 0.08)',
         display: 'flex',
         flexDirection: 'column',
+        alignItems: 'center',
         position: 'fixed',
         top: 0,
         bottom: 0,
         left: 0,
         zIndex: 100,
-        padding: '24px 16px',
-        gap: '16px'
+        padding: '20px 0',
+        gap: '20px'
       }}>
-        {/* Brand Logo */}
+        {/* Brand Logo / Mark */}
         <div 
           onClick={() => handleTabChange('home')}
-          style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '0 8px 12px 8px', borderBottom: '1px solid var(--glass-border)', cursor: 'pointer' }}
-        >
-          <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '10px',
-            background: 'linear-gradient(135deg, var(--color-accent, #2563eb), #7c3aed)',
+          style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '12px',
+            background: 'linear-gradient(135deg, #3B82F6, #2563EB)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#ffffff',
-            boxShadow: '0 4px 14px rgba(37, 99, 235, 0.4)'
-          }}>
-            <Compass size={18} />
-          </div>
-          <div>
-            <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 900, fontSize: '1.2rem', letterSpacing: '0.5px', color: 'var(--color-text-primary, #ffffff)' }}>
-              Trip<span style={{ color: 'var(--color-accent, #2563eb)' }}>Mind</span>
-            </span>
-            <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--color-text-muted)', fontWeight: 700 }}>
-              AI TRAVEL INTELLIGENCE
-            </span>
-          </div>
+            color: '#FFFFFF',
+            cursor: 'pointer',
+            boxShadow: '0 4px 14px rgba(59, 130, 246, 0.35)'
+          }}
+          title="TripMind Home"
+        >
+          <Compass size={22} />
         </div>
 
         {variant === 'admin' && (
           <button
             onClick={() => setShowOnboardModal(true)}
             style={{
-              padding: '10px 14px',
-              borderRadius: '12px',
-              background: 'linear-gradient(135deg, var(--color-accent), var(--color-purple))',
-              color: '#ffffff',
-              fontWeight: 800,
-              fontSize: '0.8rem',
-              border: 'none',
+              width: '42px',
+              height: '42px',
+              borderRadius: '10px',
+              background: 'rgba(59, 130, 246, 0.15)',
+              color: '#3B82F6',
+              border: '1px solid rgba(59, 130, 246, 0.3)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px',
               cursor: 'pointer'
             }}
+            title="Onboard Agency"
           >
-            <Building2 size={16} /> Onboard Agency
+            <Building2 size={18} />
           </button>
         )}
 
-        {/* Navigation Items */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto', flex: 1 }} className="sidebar-scrollable-links">
+        {/* Main Navigation Items */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', flex: 1, width: '100%' }}>
           {navItems.map(item => {
-            const isActive = activeTab === item.id || (item.id === 'ready-trips' && activeTab === 'ready');
-            return (
-              <button
-                key={item.id}
-                onClick={() => handleTabChange(item.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '9px 12px',
-                  borderRadius: '10px',
-                  fontWeight: 700,
-                  fontSize: '0.84rem',
-                  border: 'none',
-                  background: isActive 
-                    ? 'rgba(37, 99, 235, 0.12)' 
-                    : 'transparent',
-                  color: isActive 
-                    ? '#2563eb' 
-                    : item.highlight 
-                      ? '#2563eb' 
-                      : 'var(--color-text-secondary, #475569)',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <span style={{ color: isActive ? '#2563eb' : 'inherit' }}>{item.icon}</span>
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-
-          <div style={{ height: '1px', background: 'var(--glass-border, rgba(15,23,42,0.08))', margin: '8px 4px' }} />
-
-          {[
-            { id: 'profile', label: t('dashboard.profile'), icon: <User size={17} /> },
-            { id: 'settings', label: t('dashboard.settings'), icon: <SettingsIcon size={17} /> }
-          ].map(item => {
             const isActive = activeTab === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => handleTabChange(item.id)}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '9px 12px',
-                  borderRadius: '10px',
-                  fontWeight: 700,
-                  fontSize: '0.84rem',
+                  width: '54px',
+                  height: '52px',
+                  borderRadius: '12px',
                   border: 'none',
-                  background: isActive ? 'rgba(37, 99, 235, 0.12)' : 'transparent',
-                  color: isActive ? '#2563eb' : 'var(--color-text-muted, #64748b)',
+                  background: isActive ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                  color: isActive ? '#3B82F6' : '#94A3B8',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '3px',
                   cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'all 0.15s ease'
+                  transition: 'all 0.15s ease',
+                  position: 'relative'
                 }}
+                onMouseEnter={(e) => {
+                  if (!isActive) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) e.currentTarget.style.background = 'transparent';
+                }}
+                title={item.label}
               >
-                <span style={{ color: isActive ? '#2563eb' : 'inherit' }}>{item.icon}</span>
-                <span>{item.label}</span>
+                {isActive && (
+                  <div style={{
+                    position: 'absolute',
+                    left: '2px',
+                    top: '12px',
+                    bottom: '12px',
+                    width: '3px',
+                    borderRadius: '4px',
+                    background: '#3B82F6'
+                  }} />
+                )}
+                <span>{item.icon}</span>
+                <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.2px' }}>
+                  {item.label}
+                </span>
               </button>
             );
           })}
-        </div>
 
-        {/* Bottom AI Promo Card (Reference 3) */}
-        <div style={{
-          background: 'linear-gradient(180deg, #dbeafe 0%, #eff6ff 100%)',
-          borderRadius: '16px',
-          padding: '14px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '10px',
-          border: '1px solid rgba(37, 99, 235, 0.2)',
-          boxShadow: '0 4px 12px rgba(37, 99, 235, 0.06)'
-        }}>
-          <div style={{
-            width: '100%',
-            height: '70px',
-            borderRadius: '10px',
-            overflow: 'hidden',
-            position: 'relative',
-            background: 'linear-gradient(135deg, #60a5fa, #2563eb)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <Plane size={32} style={{ color: '#ffffff', transform: 'rotate(-25deg)', filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.2))' }} />
-          </div>
-          <div>
-            <h5 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.25 }}>
-              Turn your travel ideas into amazing trips with AI
-            </h5>
-          </div>
+          {/* Divider */}
+          <div style={{ width: '36px', height: '1px', background: 'rgba(255, 255, 255, 0.08)', margin: '8px 0' }} />
+
+          {/* Settings Nav Item */}
           <button
-            onClick={() => handleTabChange('planner')}
+            onClick={() => handleTabChange('settings')}
             style={{
-              background: '#0f172a',
-              color: '#ffffff',
+              width: '54px',
+              height: '52px',
+              borderRadius: '12px',
               border: 'none',
-              borderRadius: '100px',
-              padding: '7px 12px',
-              fontSize: '0.75rem',
-              fontWeight: 800,
-              cursor: 'pointer',
+              background: activeTab === 'settings' ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+              color: activeTab === 'settings' ? '#3B82F6' : '#94A3B8',
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '4px'
+              gap: '3px',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
             }}
+            title="Settings"
           >
-            <span>Plan with AI</span>
-            <ArrowRight size={12} />
+            <SettingsIcon size={18} />
+            <span style={{ fontSize: '0.62rem', fontWeight: 700 }}>Settings</span>
           </button>
         </div>
-        {/* Logout */}
-        <button
-          onClick={() => {
-            logout();
-            router.push('/');
-          }}
+
+        {/* Profile Avatar at Bottom */}
+        <div 
+          onClick={() => handleTabChange('profile')}
           style={{
-            padding: '10px 14px',
-            borderRadius: '10px',
-            border: '1px solid rgba(239, 68, 68, 0.2)',
-            background: 'rgba(239, 68, 68, 0.05)',
-            color: '#ef4444',
-            fontWeight: 700,
-            fontSize: '0.8rem',
-            cursor: 'pointer'
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            cursor: 'pointer',
+            gap: '4px'
           }}
+          title="User Profile"
         >
-          {t('navbar.signOut')}
-        </button>
+          <div style={{
+            width: '38px',
+            height: '38px',
+            borderRadius: '50%',
+            overflow: 'hidden',
+            border: activeTab === 'profile' ? '2px solid #3B82F6' : '1px solid rgba(255, 255, 255, 0.15)'
+          }}>
+            <img 
+              src={user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&h=80&q=80'} 
+              alt={user?.name || 'User'} 
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+            />
+          </div>
+        </div>
       </aside>
 
-      {/* ==================== MAIN VIEW WRAPPER ==================== */}
-      <div style={{ flex: 1, marginLeft: '240px', display: 'flex', flexDirection: 'column', minHeight: '100vh' }} className="dashboard-content-wrapper">
+      {/* ==================== MAIN CONTENT AREA ==================== */}
+      <div style={{ flex: 1, marginLeft: '78px', display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
         
-        {/* Sticky Top Header Navigation */}
+        {/* TOP HEADER */}
         <header style={{
-          height: '70px',
-          borderBottom: '1px solid var(--glass-border, rgba(255,255,255,0.08))',
-          background: 'var(--color-bg-surface, #0f172a)',
+          height: '72px',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          background: '#07111F',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -418,125 +395,186 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
           top: 0,
           zIndex: 90
         }}>
-          {/* Global Search Bar */}
-          <div style={{ display: 'flex', alignItems: 'center', background: 'var(--color-bg, #090d1a)', border: '1px solid var(--glass-border)', borderRadius: '100px', padding: '6px 16px', width: '320px' }}>
-            <Search size={16} style={{ color: 'var(--color-text-muted)', marginRight: '8px' }} />
-            <input 
-              type="text" 
-              placeholder="Search cities, tours, sights..." 
-              style={{ width: '100%', fontSize: '0.85rem', color: 'var(--color-text-primary, #ffffff)' }} 
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleTabChange('explore');
-              }}
-            />
+          {/* Left: Heading & Subtitle */}
+          <div>
+            <h1 style={{
+              margin: 0,
+              fontSize: '1.25rem',
+              fontWeight: 800,
+              color: '#F8FAFC',
+              fontFamily: "'Outfit', sans-serif",
+              lineHeight: 1.15
+            }}>
+              Explore the world
+            </h1>
+            <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>
+              Discover destinations, places and experiences.
+            </span>
           </div>
 
-          {/* Controls: Currency, Language, Dark Mode, Notifications, User */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          {/* Center / Large: Search Input */}
+          <div ref={headerSearchRef} style={{ position: 'relative', width: '420px', maxWidth: '40vw' }}>
+            <form
+              onSubmit={handleHeaderSearchSubmit}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                background: '#101E32',
+                border: isHeaderSearchFocused ? '1px solid #3B82F6' : '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '100px',
+                padding: '7px 16px',
+                transition: 'border 0.2s ease'
+              }}
+            >
+              <Search size={16} style={{ color: isHeaderSearchFocused ? '#60A5FA' : '#94A3B8', marginRight: '10px', flexShrink: 0 }} />
+              <input 
+                type="text" 
+                value={headerSearchQuery}
+                onChange={(e) => setHeaderSearchQuery(e.target.value)}
+                onFocus={() => setIsHeaderSearchFocused(true)}
+                placeholder="Search countries, cities or destinations..." 
+                style={{
+                  width: '100%',
+                  fontSize: '0.82rem',
+                  color: '#F8FAFC',
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none'
+                }} 
+              />
+              {headerSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setHeaderSearchQuery('')}
+                  style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '2px', display: 'flex' }}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </form>
+
+            {/* Suggestions dropdown */}
+            <AnimatePresence>
+              {isHeaderSearchFocused && headerSuggestions.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  style={{
+                    position: 'absolute',
+                    top: '46px',
+                    left: 0,
+                    right: 0,
+                    background: '#101E32',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    borderRadius: '14px',
+                    padding: '6px',
+                    boxShadow: '0 12px 30px rgba(0, 0, 0, 0.5)',
+                    zIndex: 200,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px'
+                  }}
+                >
+                  {headerSuggestions.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        handleSelectCountry(item.id);
+                        setHeaderSearchQuery('');
+                        setIsHeaderSearchFocused(false);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#F8FAFC',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'background 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>{item.flag}</span>
+                        <div>
+                          <strong style={{ fontSize: '0.82rem', display: 'block' }}>{item.name}</strong>
+                          <span style={{ fontSize: '0.68rem', color: '#94A3B8' }}>{item.country}</span>
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '0.68rem', color: '#60A5FA', fontWeight: 700 }}>
+                        Select
+                      </span>
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Right: Currency, Language, Notifications, User */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             
-            {/* Currency Selector Dropdown */}
+            {/* Currency Selector */}
             <div ref={currRef} style={{ position: 'relative' }}>
               <button
                 onClick={() => setIsCurrencyDropdownOpen(!isCurrencyDropdownOpen)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
-                  fontSize: '0.8rem',
+                  gap: '5px',
+                  fontSize: '0.75rem',
                   fontWeight: 800,
-                  color: '#10b981',
-                  background: 'var(--color-bg, #090d1a)',
-                  padding: '6px 12px',
+                  color: '#60A5FA',
+                  background: '#101E32',
+                  padding: '5px 10px',
                   borderRadius: '100px',
-                  border: '1px solid var(--glass-border)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
                   cursor: 'pointer'
                 }}
               >
                 <span>{currency}</span>
-                <ChevronDown size={12} />
+                <ChevronDown size={11} />
               </button>
               {isCurrencyDropdownOpen && (
                 <div style={{
                   position: 'absolute',
-                  top: '36px',
+                  top: '34px',
                   right: 0,
-                  background: 'var(--color-bg-surface, #0f172a)',
-                  border: '1px solid var(--glass-border)',
+                  background: '#101E32',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
                   borderRadius: '12px',
                   padding: '6px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '4px',
+                  gap: '3px',
                   zIndex: 200,
-                  boxShadow: 'var(--glass-shadow)',
-                  minWidth: '130px'
+                  boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                  minWidth: '120px'
                 }}>
                   {currencies.map(c => (
                     <button
                       key={c.code}
                       onClick={() => { setCurrency(c.code); setIsCurrencyDropdownOpen(false); }}
                       style={{
-                        padding: '8px 12px',
-                        borderRadius: '8px',
-                        fontSize: '0.8rem',
+                        padding: '6px 10px',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
                         border: 'none',
-                        background: currency === c.code ? 'rgba(16, 185, 129, 0.15)' : 'transparent',
-                        color: currency === c.code ? '#10b981' : 'var(--color-text-secondary)',
+                        background: currency === c.code ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+                        color: currency === c.code ? '#60A5FA' : '#94A3B8',
                         cursor: 'pointer',
                         textAlign: 'left',
                         fontWeight: 700
                       }}
                     >
-                      {c.symbol} {c.code} ({c.name})
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Language Selector Dropdown */}
-            <div ref={langRef} style={{ position: 'relative' }}>
-              <button
-                onClick={() => setIsLangDropdownOpen(!isLangDropdownOpen)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontSize: '0.8rem',
-                  fontWeight: 700,
-                  color: 'var(--color-text-secondary)',
-                  background: 'var(--color-bg, #090d1a)',
-                  padding: '6px 12px',
-                  borderRadius: '100px',
-                  border: '1px solid var(--glass-border)',
-                  cursor: 'pointer'
-                }}
-              >
-                <span>{language.toUpperCase() === 'EN' ? '🇬🇧 EN' : language.toUpperCase() === 'RU' ? '🇷🇺 RU' : '🇺🇿 UZ'}</span>
-                <ChevronDown size={12} />
-              </button>
-              {isLangDropdownOpen && (
-                <div style={{
-                  position: 'absolute',
-                  top: '36px',
-                  right: 0,
-                  background: 'var(--color-bg-surface, #0f172a)',
-                  border: '1px solid var(--glass-border)',
-                  borderRadius: '12px',
-                  padding: '6px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px',
-                  zIndex: 200,
-                  boxShadow: 'var(--glass-shadow)'
-                }}>
-                  {(['EN', 'RU', 'UZ'] as const).map(l => (
-                    <button
-                      key={l}
-                      onClick={() => { setLanguage(l.toLowerCase() as any); setIsLangDropdownOpen(false); }}
-                      style={{ padding: '8px 12px', borderRadius: '8px', fontSize: '0.8rem', border: 'none', background: language.toUpperCase() === l ? 'var(--color-accent-glow)' : 'transparent', color: language.toUpperCase() === l ? 'var(--color-accent)' : 'var(--color-text-secondary)', cursor: 'pointer', textAlign: 'left', width: '110px' }}
-                    >
-                      {l === 'EN' ? 'English' : l === 'RU' ? 'Русский' : 'O‘zbekcha'}
+                      {c.symbol} {c.code}
                     </button>
                   ))}
                 </div>
@@ -547,19 +585,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
             <button 
               onClick={toggleTheme}
               style={{
-                width: '36px',
-                height: '36px',
+                width: '34px',
+                height: '34px',
                 borderRadius: '50%',
-                border: '1px solid var(--glass-border)',
-                background: 'var(--color-bg, #090d1a)',
-                color: 'var(--color-text-secondary)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                background: '#101E32',
+                color: '#94A3B8',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer'
               }}
+              title="Toggle Theme"
             >
-              {theme === 'dark' ? <Sun size={16} style={{ color: '#f59e0b' }} /> : <Moon size={16} />}
+              {theme === 'dark' ? <Sun size={15} style={{ color: '#F59E0B' }} /> : <Moon size={15} />}
             </button>
 
             {/* Notification Bell */}
@@ -567,12 +606,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
               <button 
                 onClick={() => setShowNotifications(!showNotifications)}
                 style={{
-                  width: '36px',
-                  height: '36px',
+                  width: '34px',
+                  height: '34px',
                   borderRadius: '50%',
-                  border: '1px solid var(--glass-border)',
-                  background: 'var(--color-bg, #090d1a)',
-                  color: 'var(--color-text-secondary)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  background: '#101E32',
+                  color: '#94A3B8',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -580,31 +619,47 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
                   cursor: 'pointer'
                 }}
               >
-                <Bell size={16} />
-                <span style={{ position: 'absolute', top: '-4px', right: '-4px', width: '14px', height: '14px', borderRadius: '50%', background: '#ef4444', color: '#ffffff', fontSize: '0.6rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>2</span>
+                <Bell size={15} />
+                <span style={{
+                  position: 'absolute',
+                  top: '-2px',
+                  right: '-2px',
+                  width: '12px',
+                  height: '12px',
+                  borderRadius: '50%',
+                  background: '#3B82F6',
+                  color: '#FFFFFF',
+                  fontSize: '0.55rem',
+                  fontWeight: 900,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>2</span>
               </button>
 
               {showNotifications && (
                 <div style={{
                   position: 'absolute',
-                  top: '42px',
+                  top: '40px',
                   right: 0,
-                  width: '280px',
-                  background: 'var(--color-bg-surface, #0f172a)',
-                  border: '1px solid var(--glass-border)',
-                  borderRadius: '14px',
-                  padding: '14px',
-                  boxShadow: 'var(--glass-shadow)',
+                  width: '260px',
+                  background: '#101E32',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  borderRadius: '12px',
+                  padding: '12px',
+                  boxShadow: '0 12px 30px rgba(0, 0, 0, 0.5)',
                   zIndex: 200,
                   textAlign: 'left'
                 }}>
-                  <strong style={{ fontSize: '0.85rem', color: '#ffffff', display: 'block', marginBottom: '8px' }}>Traveler Alerts</strong>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ padding: '6px 8px', background: 'rgba(37,99,235,0.1)', borderRadius: '8px' }}>
-                      ✨ AI Plan ready for inspection in Samarkand.
+                  <strong style={{ fontSize: '0.8rem', color: '#F8FAFC', display: 'block', marginBottom: '6px' }}>
+                    Notifications
+                  </strong>
+                  <div style={{ fontSize: '0.72rem', color: '#94A3B8', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ padding: '6px 8px', background: 'rgba(59,130,246,0.1)', borderRadius: '6px', color: '#F8FAFC' }}>
+                      ✨ AI Itinerary generated for Paris.
                     </div>
-                    <div style={{ padding: '6px 8px', background: 'rgba(16,185,129,0.1)', borderRadius: '8px' }}>
-                      🏷️ 3 Tour Agency packages matched your duration.
+                    <div style={{ padding: '6px 8px', background: 'rgba(16,185,129,0.1)', borderRadius: '6px', color: '#F8FAFC' }}>
+                      🌍 4 new destinations added to catalog.
                     </div>
                   </div>
                 </div>
@@ -614,512 +669,518 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
             {/* User Profile Mini */}
             <div 
               onClick={() => handleTabChange('profile')}
-              style={{ display: 'flex', alignItems: 'center', gap: '10px', borderLeft: '1px solid var(--glass-border)', paddingLeft: '16px', cursor: 'pointer' }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                borderLeft: '1px solid rgba(255, 255, 255, 0.08)',
+                paddingLeft: '12px',
+                cursor: 'pointer'
+              }}
             >
               <img 
                 src={user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&h=80&q=80'} 
                 alt={user?.name} 
-                loading="lazy"
-                style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} 
+                style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} 
               />
-              <div style={{ textAlign: 'left' }}>
-                <strong style={{ fontSize: '0.85rem', display: 'block', color: 'var(--color-text-primary, #ffffff)' }}>{user?.name || 'Traveler'}</strong>
-                <span style={{ fontSize: '0.65rem', color: 'var(--color-accent, #2563eb)', fontWeight: 800 }}>TripMind Member</span>
-              </div>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#F8FAFC' }}>
+                {user?.name || 'Traveler'}
+              </span>
             </div>
 
           </div>
         </header>
 
-        {/* Scrollable View Content */}
-        <div style={{ flex: 1, padding: '28px', overflowY: 'auto' }}>
+        {/* VIEW CONTENT */}
+        <div style={{ flex: 1, padding: '24px 32px', overflowY: 'auto' }}>
           
           {/* ==================== HOME TAB ==================== */}
           {activeTab === 'home' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
               
-              {/* ACTIVE TRIP COCKPIT (Conditionally displayed when traveler has trip) */}
-              {activeTrip && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.15), rgba(16, 185, 129, 0.1))',
-                    border: '1px solid rgba(37, 99, 235, 0.3)',
-                    borderRadius: '20px',
-                    padding: '20px 28px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: '16px',
-                    textAlign: 'left'
-                  }}
-                >
+              {/* MAIN HERO EXPLORATION AREA: 3-Column Layout with Center 3D Globe */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '260px 1.4fr 340px',
+                gap: '20px',
+                alignItems: 'stretch'
+              }} className="explore-main-grid">
+                
+                {/* 1. LEFT CONTEXTUAL PANEL */}
+                <div style={{
+                  background: '#101E32',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: '16px',
+                  padding: '20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  gap: '16px',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)'
+                }}>
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-                      <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: '#10b981', letterSpacing: '0.5px' }}>
-                        ACTIVE VOYAGE IN PROGRESS
-                      </span>
-                    </div>
-                    <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 900, color: '#ffffff' }}>
-                      {activeTrip.destination} • Day 1 of {activeTrip.rawTripData?.days?.length || 5}
-                    </h3>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginTop: '2px', display: 'block' }}>
-                      Next Up: Registan Ensemble (09:30 AM) • Estimated budget: {formatPrice(activeTrip.totalCost || 1200)}
+                    <span style={{
+                      fontSize: '0.65rem',
+                      fontWeight: 800,
+                      color: '#3B82F6',
+                      letterSpacing: '1px',
+                      textTransform: 'uppercase',
+                      display: 'block',
+                      marginBottom: '4px'
+                    }}>
+                      Interactive Orbit
                     </span>
+                    <h2 style={{
+                      margin: 0,
+                      fontSize: '1.25rem',
+                      fontWeight: 900,
+                      color: '#F8FAFC',
+                      fontFamily: "'Outfit', sans-serif",
+                      lineHeight: 1.2
+                    }}>
+                      Explore the world
+                    </h2>
+                    <p style={{
+                      margin: '6px 0 0 0',
+                      fontSize: '0.78rem',
+                      color: '#94A3B8',
+                      lineHeight: 1.5
+                    }}>
+                      Select any country on the 3D globe to discover destinations, telemetry, and live facts.
+                    </p>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {/* Recent Searches Tags */}
+                  <div>
+                    <span style={{
+                      fontSize: '0.68rem',
+                      fontWeight: 800,
+                      color: '#94A3B8',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      display: 'block',
+                      marginBottom: '8px'
+                    }}>
+                      Recent searches
+                    </span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {recentSearches.map((item, idx) => {
+                        const isCurrent = selectedCountryId.toLowerCase() === item.toLowerCase();
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => handleSelectCountry(item)}
+                            style={{
+                              padding: '5px 10px',
+                              borderRadius: '8px',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              background: isCurrent ? 'rgba(59, 130, 246, 0.2)' : '#0B1728',
+                              border: isCurrent ? '1px solid #3B82F6' : '1px solid rgba(255, 255, 255, 0.08)',
+                              color: isCurrent ? '#60A5FA' : '#F8FAFC',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isCurrent) e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isCurrent) e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                            }}
+                          >
+                            {item}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* AI Quick CTA */}
+                  <div style={{
+                    background: '#0B1728',
+                    border: '1px solid rgba(59, 130, 246, 0.2)',
+                    borderRadius: '12px',
+                    padding: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#60A5FA' }}>
+                      <Sparkles size={14} />
+                      <strong style={{ fontSize: '0.75rem' }}>AI Trip Copilot</strong>
+                    </div>
+                    <span style={{ fontSize: '0.7rem', color: '#94A3B8' }}>
+                      Ready to build a customized daily itinerary for {selectedCountryObj.name || 'your journey'}?
+                    </span>
                     <button
-                      onClick={() => {
-                        setSelectedTripId(activeTrip.id);
-                        handleTabChange('trip-details');
-                      }}
-                      className="btn-primary"
-                      style={{ padding: '9px 16px', fontSize: '0.8rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}
-                    >
-                      <Map size={14} /> Open Workspace
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedTripId(activeTrip.id);
-                        handleTabChange('trip-details');
-                      }}
+                      onClick={() => handleStartPlanningFor(selectedCountryId)}
                       style={{
-                        padding: '9px 14px',
-                        borderRadius: '10px',
-                        border: '1px solid rgba(245, 158, 11, 0.3)',
-                        background: 'rgba(245, 158, 11, 0.1)',
-                        color: '#f59e0b',
-                        fontSize: '0.8rem',
+                        padding: '6px 10px',
+                        borderRadius: '8px',
+                        background: '#3B82F6',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        fontSize: '0.72rem',
                         fontWeight: 800,
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px'
                       }}
                     >
-                      ⚡ "I'm Tired"
+                      <span>Plan with AI</span>
+                      <ArrowRight size={11} />
                     </button>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Row 1: 3D Globe with 3 Metric Badges + Country Info Panel (Reference 3) */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.45fr 1fr', gap: '24px' }} className="explore-main-grid">
-                {/* Left: 3D Globe Card */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{
-                    height: '460px',
-                    background: 'var(--color-bg-surface, #ffffff)',
-                    border: '1px solid var(--border, rgba(15,23,42,0.08))',
-                    boxShadow: '0 4px 20px -2px rgba(15,23,42,0.04)',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    borderRadius: '20px'
-                  }}>
-                    <Globe3D 
-                      selectedCountryId={selectedCountryId}
-                      compact={true}
-                      onSelectCountry={(id) => setSelectedCountryId(id)}
-                      onSelectedFeature={(feat) => setSelectedFeature(feat)}
-                      onCreateTrip={() => handleStartPlanningFor(selectedCountryId)}
-                    />
-                  </div>
-
-                  {/* 3 Metrics Badges under Globe (Reference 3) */}
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(3, 1fr)',
-                    gap: '12px'
-                  }}>
-                    <div style={{
-                      background: 'var(--color-bg-surface, #ffffff)',
-                      border: '1px solid var(--border, rgba(15,23,42,0.08))',
-                      boxShadow: '0 2px 8px rgba(15,23,42,0.03)',
-                      borderRadius: '16px',
-                      padding: '12px 14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px'
-                    }}>
-                      <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'rgba(37, 99, 235, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
-                        <Luggage size={16} />
-                      </div>
-                      <div>
-                        <strong style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--color-text-primary, #0f172a)', display: 'block' }}>195</strong>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted, #64748b)' }}>Countries</span>
-                      </div>
-                    </div>
-
-                    <div style={{
-                      background: 'var(--color-bg-surface, #ffffff)',
-                      border: '1px solid var(--border, rgba(15,23,42,0.08))',
-                      boxShadow: '0 2px 8px rgba(15,23,42,0.03)',
-                      borderRadius: '16px',
-                      padding: '12px 14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px'
-                    }}>
-                      <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981' }}>
-                        <MapPin size={16} />
-                      </div>
-                      <div>
-                        <strong style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--color-text-primary, #0f172a)', display: 'block' }}>25,000+</strong>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted, #64748b)' }}>Destinations</span>
-                      </div>
-                    </div>
-
-                    <div style={{
-                      background: 'var(--color-bg-surface, #ffffff)',
-                      border: '1px solid var(--border, rgba(15,23,42,0.08))',
-                      boxShadow: '0 2px 8px rgba(15,23,42,0.03)',
-                      borderRadius: '16px',
-                      padding: '12px 14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px'
-                    }}>
-                      <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'rgba(124, 58, 237, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7c3aed' }}>
-                        <Sparkles size={16} />
-                      </div>
-                      <div>
-                        <strong style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--color-text-primary, #0f172a)', display: 'block' }}>AI Travel Planner</strong>
-                        <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted, #64748b)' }}>Your personal assistant</span>
-                      </div>
-                    </div>
                   </div>
                 </div>
 
-                {/* Right: Destination Telemetry Panel (Inline Mode, Reference 3) */}
+                {/* 2. CENTER: 3D GLOBE CANVAS (Dominates exploration area) */}
                 <div style={{
-                  height: '528px',
-                  background: 'var(--color-bg-surface, #ffffff)',
-                  border: '1px solid var(--border, rgba(15,23,42,0.08))',
-                  boxShadow: '0 4px 20px -2px rgba(15,23,42,0.04)',
-                  borderRadius: '20px',
-                  overflow: 'hidden'
+                  height: '490px',
+                  background: '#0B1728',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: '16px',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  boxShadow: '0 4px 25px rgba(0, 0, 0, 0.35)'
+                }}>
+                  <Globe3D 
+                    selectedCountryId={selectedCountryId}
+                    compact={true}
+                    onSelectCountry={(id) => handleSelectCountry(id)}
+                    onSelectedFeature={(feat) => setSelectedFeature(feat)}
+                    onCreateTrip={() => handleStartPlanningFor(selectedCountryId)}
+                  />
+                </div>
+
+                {/* 3. RIGHT: DYNAMIC COUNTRY INFORMATION PANEL */}
+                <div style={{
+                  height: '490px',
+                  background: '#101E32',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: '16px',
+                  overflow: 'hidden',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)'
                 }}>
                   <CountryInfoPanel 
                     country={selectedCountryObj}
                     inline={true}
                     onCreateTrip={() => handleStartPlanningFor(selectedCountryId)}
+                    onExploreDestination={() => handleTabChange('explore')}
                   />
                 </div>
+
               </div>
 
-              {/* Row 2: Popular Destinations (50%) + Recommended For You (50%) (Reference 3) */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }} className="explore-main-grid">
-                {/* Column A: Popular Destinations */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: 'var(--color-text-primary, #0f172a)', fontFamily: 'var(--font-heading)' }}>
-                      Popular Destinations
-                    </h3>
-                    <button 
-                      onClick={() => handleTabChange('explore')}
-                      style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-accent, #2563eb)', background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-                    >
-                      <span>View all</span>
-                      <ArrowRight size={13} />
-                    </button>
+              {/* TRAVEL STATS (Minimal Compact Cards) */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, 1fr)',
+                gap: '14px'
+              }}>
+                {[
+                  { label: 'Countries explored', value: '12', icon: <Globe size={16} />, color: '#3B82F6' },
+                  { label: 'Cities viewed', value: '38', icon: <MapPin size={16} />, color: '#60A5FA' },
+                  { label: 'Saved destinations', value: '8', icon: <Heart size={16} />, color: '#EF4444' },
+                  { label: 'Trips planned', value: '3', icon: <Sparkles size={16} />, color: '#10B981' }
+                ].map((stat, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      background: '#101E32',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: '14px',
+                      padding: '14px 18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}
+                  >
+                    <div>
+                      <span style={{ fontSize: '0.72rem', color: '#94A3B8', display: 'block' }}>
+                        {stat.label}
+                      </span>
+                      <strong style={{ fontSize: '1.25rem', fontWeight: 900, color: '#F8FAFC', fontFamily: "'Outfit', sans-serif" }}>
+                        {stat.value}
+                      </strong>
+                    </div>
+                    <div style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '10px',
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: stat.color
+                    }}>
+                      {stat.icon}
+                    </div>
                   </div>
+                ))}
+              </div>
 
-                  {/* 4 Cards Grid (Istanbul, Paris, Dubai, Samarkand) */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: '12px' }}>
-                    {[
-                      { id: 'turkey', city: 'Istanbul', country: 'Türkiye', rating: '4.8 (12K)', tags: ['Culture', 'Food'], image: 'https://images.unsplash.com/photo-1541432901042-2d8bd64b4a9b?auto=format&fit=crop&w=400&q=80' },
-                      { id: 'france', city: 'Paris', country: 'France', rating: '4.7 (18K)', tags: ['Art', 'Romance'], image: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=400&q=80' },
-                      { id: 'dubai', city: 'Dubai', country: 'UAE', rating: '4.8 (10K)', tags: ['Luxury', 'Modern'], image: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=400&q=80' },
-                      { id: 'uzbekistan', city: 'Samarkand', country: 'Uzbekistan', rating: '4.9 (8K)', tags: ['History', 'Culture'], image: 'https://images.unsplash.com/photo-1587974928442-77dc3e0dba72?auto=format&fit=crop&w=400&q=80' },
-                    ].map((dest, i) => (
+              {/* POPULAR DESTINATIONS (Horizontal Cards) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#F8FAFC', fontFamily: "'Outfit', sans-serif" }}>
+                    Popular destinations
+                  </h3>
+                  <button 
+                    onClick={() => handleTabChange('explore')}
+                    style={{
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      color: '#60A5FA',
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <span>View all</span>
+                    <ArrowRight size={12} />
+                  </button>
+                </div>
+
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
+                  gap: '14px',
+                  overflowX: 'auto'
+                }}>
+                  {[
+                    { id: 'france', city: 'Paris', country: 'France', rating: '4.8', image: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=400&q=80' },
+                    { id: 'japan', city: 'Tokyo', country: 'Japan', rating: '4.9', image: 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=400&q=80' },
+                    { id: 'uae', city: 'Dubai', country: 'UAE', rating: '4.8', image: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=400&q=80' },
+                    { id: 'turkey', city: 'Istanbul', country: 'Türkiye', rating: '4.8', image: 'https://images.unsplash.com/photo-1541432901042-2d8bd64b4a9b?auto=format&fit=crop&w=400&q=80' },
+                    { id: 'usa', city: 'New York', country: 'USA', rating: '4.7', image: 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?auto=format&fit=crop&w=400&q=80' },
+                    { id: 'uzbekistan', city: 'Samarkand', country: 'Uzbekistan', rating: '4.9', image: 'https://images.unsplash.com/photo-1587974928442-77dc3e0dba72?auto=format&fit=crop&w=400&q=80' }
+                  ].map((dest, idx) => {
+                    const isSelected = selectedCountryId.toLowerCase() === dest.id;
+                    return (
                       <div
-                        key={i}
-                        onClick={() => {
-                          setSelectedCountryId(dest.id);
-                          setPlannerDestination(`${dest.city}, ${dest.country}`);
-                        }}
+                        key={idx}
+                        onClick={() => handleSelectCountry(dest.id)}
                         style={{
-                          background: 'var(--color-bg-surface, #ffffff)',
-                          border: selectedCountryId === dest.id ? '2px solid var(--color-accent, #2563eb)' : '1px solid var(--border, rgba(15,23,42,0.08))',
-                          borderRadius: '16px',
+                          background: '#101E32',
+                          border: isSelected ? '2px solid #3B82F6' : '1px solid rgba(255, 255, 255, 0.08)',
+                          borderRadius: '14px',
                           overflow: 'hidden',
                           cursor: 'pointer',
-                          boxShadow: '0 2px 8px rgba(15,23,42,0.04)',
+                          boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
                           transition: 'all 0.2s ease',
                           display: 'flex',
                           flexDirection: 'column'
                         }}
-                      >
-                        {/* Card Image */}
-                        <div style={{ position: 'relative', height: '105px', width: '100%', overflow: 'hidden' }}>
-                          <img src={dest.image} alt={dest.city} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                            }}
-                            style={{
-                              position: 'absolute',
-                              top: '6px',
-                              right: '6px',
-                              width: '26px',
-                              height: '26px',
-                              borderRadius: '50%',
-                              background: 'rgba(255, 255, 255, 0.85)',
-                              border: 'none',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: '#64748b',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            <Heart size={13} />
-                          </button>
-                        </div>
-
-                        {/* Card Body */}
-                        <div style={{ padding: '9px 10px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <strong style={{ fontSize: '0.82rem', color: 'var(--color-text-primary, #0f172a)' }}>{dest.city}</strong>
-                            <ChevronRight size={13} style={{ color: 'var(--color-text-muted, #94a3b8)' }} />
-                          </div>
-                          <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted, #64748b)' }}>{dest.country}</span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px' }}>
-                            <Star size={11} fill="#f59e0b" stroke="none" />
-                            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--color-text-primary, #0f172a)' }}>{dest.rating}</span>
-                          </div>
-                          <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', marginTop: '3px' }}>
-                            {dest.tags.map((t, idx) => (
-                              <span key={idx} style={{ fontSize: '0.6rem', fontWeight: 600, background: 'var(--bg-secondary, #f1f5f9)', color: 'var(--color-text-secondary, #475569)', padding: '2px 5px', borderRadius: '5px' }}>
-                                {t}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Column B: Recommended For You */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: 'var(--color-text-primary, #0f172a)', fontFamily: 'var(--font-heading)' }}>
-                        Recommended for you
-                      </h3>
-                      <div style={{ display: 'flex', gap: '3px', background: 'var(--bg-secondary, #f1f5f9)', padding: '3px', borderRadius: '100px' }}>
-                        {['AI Picks', 'Ready Tours', 'Trending'].map((tab, idx) => (
-                          <button
-                            key={idx}
-                            style={{
-                              border: 'none',
-                              background: idx === 0 ? 'var(--color-accent, #2563eb)' : 'transparent',
-                              color: idx === 0 ? '#ffffff' : 'var(--color-text-muted, #64748b)',
-                              fontSize: '0.68rem',
-                              fontWeight: 700,
-                              padding: '3px 8px',
-                              borderRadius: '100px',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            {tab}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => handleTabChange('tours')}
-                      style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-accent, #2563eb)', background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-                    >
-                      <span>View all</span>
-                      <ArrowRight size={13} />
-                    </button>
-                  </div>
-
-                  {/* 3 Tour Cards (Cappadocia, Japan, Paris) */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-                    {[
-                      { 
-                        title: '5 Days in Cappadocia', 
-                        badge: 'By AI', 
-                        badgeColor: '#7c3aed',
-                        badgeBg: 'rgba(124, 58, 237, 0.12)',
-                        rating: '4.8 (1.2K)', 
-                        duration: '5 days', 
-                        travelers: '2 travelers', 
-                        tags: ['Nature', 'Adventure'], 
-                        price: 750, 
-                        image: 'https://images.unsplash.com/photo-1609137144822-44169542a222?auto=format&fit=crop&w=400&q=80',
-                        dest: 'Cappadocia, Turkey'
-                      },
-                      { 
-                        title: '7 Days in Japan', 
-                        badge: 'Popular', 
-                        badgeColor: '#2563eb',
-                        badgeBg: 'rgba(37, 99, 235, 0.12)',
-                        rating: '4.9 (2.1K)', 
-                        duration: '7 days', 
-                        travelers: '2 travelers', 
-                        tags: ['Culture', 'Food'], 
-                        price: 1250, 
-                        image: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=400&q=80',
-                        dest: 'Tokyo, Japan'
-                      },
-                      { 
-                        title: '4 Days in Paris', 
-                        badge: 'Trending', 
-                        badgeColor: '#10b981',
-                        badgeBg: 'rgba(16, 185, 129, 0.12)',
-                        rating: '4.7 (3.4K)', 
-                        duration: '4 days', 
-                        travelers: '2 travelers', 
-                        tags: ['Art', 'City'], 
-                        price: 900, 
-                        image: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=400&q=80',
-                        dest: 'Paris, France'
-                      }
-                    ].map((tour, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          background: 'var(--color-bg-surface, #ffffff)',
-                          border: '1px solid var(--border, rgba(15,23,42,0.08))',
-                          borderRadius: '16px',
-                          overflow: 'hidden',
-                          boxShadow: '0 2px 8px rgba(15,23,42,0.04)',
-                          display: 'flex',
-                          flexDirection: 'column'
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          if (!isSelected) e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          if (!isSelected) e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
                         }}
                       >
-                        {/* Tour Image */}
-                        <div style={{ position: 'relative', height: '90px', width: '100%', overflow: 'hidden' }}>
-                          <img src={tour.image} alt={tour.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          <span style={{
-                            position: 'absolute',
-                            top: '6px',
-                            left: '6px',
-                            background: tour.badgeBg,
-                            color: tour.badgeColor,
-                            fontWeight: 800,
-                            fontSize: '0.6rem',
-                            padding: '2px 7px',
-                            borderRadius: '100px'
-                          }}>
-                            {tour.badge}
-                          </span>
+                        <div style={{ position: 'relative', height: '110px', width: '100%', overflow: 'hidden' }}>
+                          <img src={dest.image} alt={dest.city} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         </div>
-
-                        {/* Tour Info */}
-                        <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, justifyContent: 'space-between' }}>
-                          <div>
-                            <strong style={{ fontSize: '0.78rem', color: 'var(--color-text-primary, #0f172a)', display: 'block', lineHeight: 1.2 }}>{tour.title}</strong>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px' }}>
-                              <Star size={10} fill="#f59e0b" stroke="none" />
-                              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--color-text-primary, #0f172a)' }}>{tour.rating}</span>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.62rem', color: 'var(--color-text-muted, #64748b)', marginTop: '2px' }}>
-                              <span>🕒 {tour.duration}</span>
-                              <span>👥 {tour.travelers}</span>
+                        <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <strong style={{ fontSize: '0.85rem', color: '#F8FAFC' }}>{dest.city}</strong>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                              <Star size={11} fill="#F59E0B" stroke="none" />
+                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#F8FAFC' }}>{dest.rating}</span>
                             </div>
                           </div>
-
-                          {/* Price & CTA Button */}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid var(--border, rgba(15,23,42,0.06))' }}>
-                            <strong style={{ fontSize: '0.85rem', color: '#10b981' }}>{formatPrice(tour.price)}</strong>
-                            <button
-                              onClick={() => handleStartPlanningFor(tour.dest)}
-                              style={{
-                                background: '#0f172a',
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: '100px',
-                                padding: '5px 8px',
-                                fontSize: '0.65rem',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '3px'
-                              }}
-                            >
-                              <span>View trip</span>
-                              <ArrowRight size={10} />
-                            </button>
-                          </div>
+                          <span style={{ fontSize: '0.7rem', color: '#94A3B8' }}>{dest.country}</span>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Row 3: Explore by Interest Carousel (Reference 3) */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {/* TRENDING NOW (3-4 Discovery Cards) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: 'var(--color-text-primary, #0f172a)', fontFamily: 'var(--font-heading)' }}>
-                    Explore by interest
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#F8FAFC', fontFamily: "'Outfit', sans-serif" }}>
+                    Trending now
                   </h3>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                  gap: '14px'
+                }}>
                   {[
-                    { label: 'Culture', icon: <Landmark size={14} /> },
-                    { label: 'Food', icon: <Utensils size={14} /> },
-                    { label: 'Nature', icon: <Sparkles size={14} /> },
-                    { label: 'Beaches', icon: <Compass size={14} /> },
-                    { label: 'Mountains', icon: <Map size={14} /> },
-                    { label: 'Adventure', icon: <Navigation size={14} /> },
-                    { label: 'Luxury', icon: <Star size={14} /> },
-                    { label: 'Family', icon: <Users size={14} /> },
-                    { label: 'Budget', icon: <Tag size={14} /> },
+                    {
+                      id: 'japan',
+                      title: 'Explore Japan',
+                      subtitle: 'Tokyo · Kyoto · Osaka',
+                      description: 'Ancient shrines, cherry blossoms, and neon metropolises.',
+                      image: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=600&q=80'
+                    },
+                    {
+                      id: 'turkey',
+                      title: 'Cappadocia Skies',
+                      subtitle: 'Göreme · Uchisar · Valley of Fairies',
+                      description: 'Hot air balloon flights over lunar landscape rock formations.',
+                      image: 'https://images.unsplash.com/photo-1609137144822-44169542a222?auto=format&fit=crop&w=600&q=80'
+                    },
+                    {
+                      id: 'uzbekistan',
+                      title: 'Silk Road Marvels',
+                      subtitle: 'Samarkand · Bukhara · Khiva',
+                      description: 'Turquoise majolica madrasahs and ancient caravanserais.',
+                      image: 'https://images.unsplash.com/photo-1587974928442-77dc3e0dba72?auto=format&fit=crop&w=600&q=80'
+                    },
+                    {
+                      id: 'france',
+                      title: 'French Riviera & Provence',
+                      subtitle: 'Nice · Cannes · Monaco',
+                      description: 'Glamorous Mediterranean beaches and lavender fields.',
+                      image: 'https://images.unsplash.com/photo-1533105079780-92b9be482077?auto=format&fit=crop&w=600&q=80'
+                    }
                   ].map((item, idx) => (
-                    <button
+                    <div
                       key={idx}
-                      onClick={() => handleTabChange('explore')}
+                      onClick={() => handleSelectCountry(item.id)}
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '8px 16px',
-                        borderRadius: '100px',
-                        background: 'var(--color-bg-surface, #ffffff)',
-                        border: '1px solid var(--border, rgba(15,23,42,0.08))',
-                        boxShadow: '0 2px 6px rgba(15,23,42,0.03)',
-                        color: 'var(--color-text-primary, #0f172a)',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
+                        background: '#101E32',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: '14px',
+                        overflow: 'hidden',
                         cursor: 'pointer',
-                        whiteSpace: 'nowrap',
-                        transition: 'all 0.15s ease'
+                        display: 'flex',
+                        flexDirection: 'column',
+                        transition: 'all 0.2s ease'
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--color-accent, #2563eb)')}
-                      onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--border, rgba(15,23,42,0.08))')}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.4)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                      }}
                     >
-                      <span style={{ color: 'var(--color-accent, #2563eb)' }}>{item.icon}</span>
-                      <span>{item.label}</span>
-                    </button>
+                      <div style={{ position: 'relative', height: '130px', width: '100%', overflow: 'hidden' }}>
+                        <img src={item.image} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <div style={{
+                          position: 'absolute',
+                          inset: 0,
+                          background: 'linear-gradient(180deg, transparent 40%, rgba(7, 17, 31, 0.9) 100%)'
+                        }} />
+                        <span style={{
+                          position: 'absolute',
+                          bottom: '8px',
+                          left: '12px',
+                          fontSize: '0.68rem',
+                          color: '#60A5FA',
+                          fontWeight: 700
+                        }}>
+                          {item.subtitle}
+                        </span>
+                      </div>
+                      <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, justifyContent: 'space-between' }}>
+                        <div>
+                          <strong style={{ fontSize: '0.9rem', color: '#F8FAFC', display: 'block' }}>{item.title}</strong>
+                          <p style={{ margin: '4px 0 0 0', fontSize: '0.72rem', color: '#94A3B8', lineHeight: 1.4 }}>{item.description}</p>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '6px' }}>
+                          <span style={{ fontSize: '0.72rem', color: '#3B82F6', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            Inspect <ChevronRight size={12} />
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   ))}
-                  <button
-                    onClick={() => handleTabChange('explore')}
+                </div>
+              </div>
+
+              {/* RECOMMENDED SECTION (Compact Itineraries) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#F8FAFC', fontFamily: "'Outfit', sans-serif" }}>
+                    Recommended for you
+                  </h3>
+                  <button 
+                    onClick={() => handleTabChange('tours')}
                     style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '50%',
-                      background: 'var(--color-bg-surface, #ffffff)',
-                      border: '1px solid var(--border, rgba(15,23,42,0.08))',
-                      boxShadow: '0 2px 6px rgba(15,23,42,0.03)',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      color: '#60A5FA',
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'var(--color-text-primary, #0f172a)',
-                      cursor: 'pointer',
-                      flexShrink: 0
+                      gap: '4px'
                     }}
                   >
-                    <ChevronRight size={15} />
+                    <span>View all packages</span>
+                    <ArrowRight size={12} />
                   </button>
+                </div>
+
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                  gap: '14px'
+                }}>
+                  {[
+                    { title: 'Weekend in Paris', duration: '5 days', price: 900, countryId: 'france', image: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=400&q=80' },
+                    { title: 'Explore Istanbul', duration: '4 days', price: 620, countryId: 'turkey', image: 'https://images.unsplash.com/photo-1541432901042-2d8bd64b4a9b?auto=format&fit=crop&w=400&q=80' },
+                    { title: 'Discover Tokyo', duration: '7 days', price: 1250, countryId: 'japan', image: 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=400&q=80' },
+                    { title: 'Silk Road Odyssey', duration: '6 days', price: 890, countryId: 'uzbekistan', image: 'https://images.unsplash.com/photo-1587974928442-77dc3e0dba72?auto=format&fit=crop&w=400&q=80' },
+                  ].map((item, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        background: '#101E32',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: '12px',
+                        padding: '10px 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '10px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <img 
+                          src={item.image} 
+                          alt={item.title} 
+                          style={{ width: '42px', height: '42px', borderRadius: '8px', objectFit: 'cover' }} 
+                        />
+                        <div>
+                          <strong style={{ fontSize: '0.82rem', color: '#F8FAFC', display: 'block' }}>{item.title}</strong>
+                          <span style={{ fontSize: '0.68rem', color: '#94A3B8' }}>⏱ {item.duration} • {formatPrice(item.price)}</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleStartPlanningFor(item.countryId)}
+                        style={{
+                          padding: '6px 10px',
+                          borderRadius: '8px',
+                          background: 'rgba(59, 130, 246, 0.15)',
+                          color: '#60A5FA',
+                          border: '1px solid rgba(59, 130, 246, 0.3)',
+                          fontSize: '0.68rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        Plan
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -1193,241 +1254,144 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialView = 'home', onVi
               initial={{ opacity: 0, scale: 0.8, y: 40 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.8, y: 40 }}
-              className="glass-panel"
               style={{
                 width: '320px',
                 height: '420px',
-                background: 'var(--color-bg-surface, #0f172a)',
-                border: '1px solid var(--glass-border)',
-                boxShadow: 'var(--glass-shadow)',
+                background: '#101E32',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: '16px',
                 display: 'flex',
                 flexDirection: 'column',
-                overflow: 'hidden',
-                borderRadius: '20px'
+                boxShadow: '0 16px 40px rgba(0, 0, 0, 0.6)',
+                overflow: 'hidden'
               }}
             >
-              {/* Header */}
-              <div style={{ padding: '16px', borderBottom: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--color-bg, #090d1a)' }}>
+              {/* Chat Header */}
+              <div style={{
+                padding: '12px 14px',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                background: '#0B1728',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Sparkles size={16} style={{ color: '#a855f7' }} />
-                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ffffff' }}>TripMind Co-pilot</span>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#3B82F6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff' }}>
+                    <Sparkles size={14} />
+                  </div>
+                  <div>
+                    <strong style={{ fontSize: '0.82rem', color: '#F8FAFC', display: 'block' }}>TripMind Copilot</strong>
+                    <span style={{ fontSize: '0.62rem', color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10B981', display: 'inline-block' }} /> Live Travel AI
+                    </span>
+                  </div>
                 </div>
-                <button onClick={() => setChatOpen(false)} style={{ color: 'var(--color-text-muted)', border: 'none', cursor: 'pointer' }}>
+                <button 
+                  onClick={() => setChatOpen(false)}
+                  style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '4px' }}
+                >
                   <X size={16} />
                 </button>
               </div>
 
-              {/* Message History */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {chatMessages.map((msg, i) => (
-                  <div
-                    key={i}
+              {/* Chat Messages */}
+              <div style={{ flex: 1, padding: '12px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {chatMessages.map((msg, idx) => (
+                  <div 
+                    key={idx}
                     style={{
                       alignSelf: msg.sender === 'user' ? 'flex-end' : 'flex-start',
-                      background: msg.sender === 'user' ? 'linear-gradient(135deg, var(--color-accent, #2563eb), #7c3aed)' : 'var(--color-bg, #090d1a)',
-                      color: '#ffffff',
-                      padding: '8px 12px',
-                      borderRadius: '12px',
-                      fontSize: '0.75rem',
                       maxWidth: '85%',
-                      textAlign: 'left',
-                      border: msg.sender === 'user' ? 'none' : '1px solid var(--glass-border)'
+                      padding: '8px 12px',
+                      borderRadius: msg.sender === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+                      background: msg.sender === 'user' ? '#3B82F6' : '#0B1728',
+                      color: msg.sender === 'user' ? '#ffffff' : '#F8FAFC',
+                      fontSize: '0.78rem',
+                      lineHeight: 1.4,
+                      border: msg.sender === 'user' ? 'none' : '1px solid rgba(255, 255, 255, 0.06)'
                     }}
                   >
                     {msg.text}
                   </div>
                 ))}
                 {sending && (
-                  <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', textAlign: 'left' }}>
-                    Claude is analyzing travel tradeoffs...
-                  </span>
+                  <div style={{ alignSelf: 'flex-start', padding: '6px 10px', background: '#0B1728', borderRadius: '12px', fontSize: '0.7rem', color: '#94A3B8' }}>
+                    Thinking...
+                  </div>
                 )}
               </div>
 
               {/* Chat Input */}
-              <form onSubmit={handleFloatingChatSend} style={{ padding: '12px', borderTop: '1px solid var(--glass-border)', display: 'flex', gap: '8px', background: 'var(--color-bg, #090d1a)' }}>
+              <form 
+                onSubmit={handleFloatingChatSend}
+                style={{
+                  padding: '8px',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                  display: 'flex',
+                  gap: '6px',
+                  background: '#0B1728'
+                }}
+              >
                 <input 
-                  type="text" 
+                  type="text"
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="Ask about sights, weather, pace..."
-                  style={{ flex: 1, padding: '8px 12px', borderRadius: '20px', border: '1px solid var(--glass-border)', background: 'var(--color-bg-surface)', color: '#ffffff', fontSize: '0.8rem' }}
+                  placeholder="Ask anything about travel..."
+                  style={{
+                    flex: 1,
+                    background: '#101E32',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    borderRadius: '8px',
+                    padding: '6px 10px',
+                    fontSize: '0.75rem',
+                    color: '#F8FAFC'
+                  }}
                 />
-                <button type="submit" className="btn-premium" style={{ padding: '8px 14px', borderRadius: '20px', border: 'none', fontSize: '0.75rem' }}>Send</button>
+                <button
+                  type="submit"
+                  disabled={sending || !chatInput.trim()}
+                  style={{
+                    background: '#3B82F6',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '6px 12px',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    opacity: sending || !chatInput.trim() ? 0.6 : 1
+                  }}
+                >
+                  Send
+                </button>
               </form>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Bubble Button */}
+        {/* Floating Copilot Toggle Button */}
         <button
           onClick={() => setChatOpen(!chatOpen)}
           style={{
-            width: '56px',
-            height: '56px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, var(--color-accent, #2563eb), #7c3aed)',
-            color: '#ffffff',
+            height: '46px',
+            padding: '0 16px',
+            borderRadius: '100px',
+            background: 'linear-gradient(135deg, #3B82F6, #2563EB)',
+            color: '#FFFFFF',
+            border: 'none',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 8px 25px rgba(37, 99, 235, 0.4)',
-            border: 'none',
-            cursor: 'pointer'
+            gap: '8px',
+            fontSize: '0.8rem',
+            fontWeight: 800,
+            cursor: 'pointer',
+            boxShadow: '0 8px 25px rgba(59, 130, 246, 0.45)'
           }}
-          aria-label="Toggle AI Co-pilot Chat"
         >
-          <Sparkles size={24} />
+          <Sparkles size={16} />
+          <span>Ask AI Copilot</span>
         </button>
       </div>
-
-      {/* ==================== INTENTIONAL MOBILE BOTTOM NAVIGATION (< 768px) ==================== */}
-      {/* Exactly the 5 items specified in UX spec (AC-01): Home, Explore, AI Planner (Elevated Center), Trips, Profile */}
-      <nav className="mobile-bottom-tabs" style={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: '64px',
-        background: 'rgba(15, 23, 42, 0.95)',
-        backdropFilter: 'blur(16px)',
-        borderTop: '1px solid var(--glass-border, rgba(255,255,255,0.08))',
-        display: 'flex',
-        justifyContent: 'space-around',
-        alignItems: 'center',
-        zIndex: 999,
-        padding: '0 8px',
-      }}>
-        {/* 1. Home */}
-        <button
-          onClick={() => handleTabChange('home')}
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '3px',
-            border: 'none',
-            background: 'transparent',
-            color: activeTab === 'home' ? 'var(--color-accent, #2563eb)' : 'var(--color-text-muted, #64748b)',
-            fontSize: '0.65rem',
-            fontWeight: 800,
-            cursor: 'pointer',
-            flex: 1
-          }}
-        >
-          <Compass size={20} />
-          <span>{t('dashboard.home')}</span>
-        </button>
-
-        {/* 2. Explore */}
-        <button
-          onClick={() => handleTabChange('explore')}
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '3px',
-            border: 'none',
-            background: 'transparent',
-            color: activeTab === 'explore' ? 'var(--color-accent, #2563eb)' : 'var(--color-text-muted, #64748b)',
-            fontSize: '0.65rem',
-            fontWeight: 800,
-            cursor: 'pointer',
-            flex: 1
-          }}
-        >
-          <Map size={20} />
-          <span>{t('dashboard.explore')}</span>
-        </button>
-
-        {/* 3. AI Planner (Center Elevated 48px circle with gradient and glow) */}
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', position: 'relative' }}>
-          <button
-            onClick={() => handleTabChange('planner')}
-            style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, var(--color-accent, #2563eb), #7c3aed)',
-              color: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 18px rgba(37, 99, 235, 0.5)',
-              border: '2px solid rgba(255, 255, 255, 0.2)',
-              marginTop: '-20px',
-              cursor: 'pointer'
-            }}
-            aria-label="Launch AI Planner"
-          >
-            <Sparkles size={22} />
-          </button>
-        </div>
-
-        {/* 4. Trips */}
-        <button
-          onClick={() => handleTabChange('my-trips')}
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '3px',
-            border: 'none',
-            background: 'transparent',
-            color: activeTab === 'my-trips' || activeTab === 'trip-details' ? 'var(--color-accent, #2563eb)' : 'var(--color-text-muted, #64748b)',
-            fontSize: '0.65rem',
-            fontWeight: 800,
-            cursor: 'pointer',
-            flex: 1
-          }}
-        >
-          <Calendar size={20} />
-          <span>{t('dashboard.myTrips')}</span>
-        </button>
-
-        {/* 5. Profile */}
-        <button
-          onClick={() => handleTabChange('profile')}
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '3px',
-            border: 'none',
-            background: 'transparent',
-            color: activeTab === 'profile' ? 'var(--color-accent, #2563eb)' : 'var(--color-text-muted, #64748b)',
-            fontSize: '0.65rem',
-            fontWeight: 800,
-            cursor: 'pointer',
-            flex: 1
-          }}
-        >
-          <User size={20} />
-          <span>{t('dashboard.profile')}</span>
-        </button>
-      </nav>
-
-      {/* Responsive layout styles */}
-      <style dangerouslySetInnerHTML={{ __html: `
-        .mobile-bottom-tabs {
-          display: none !important;
-        }
-        @media (max-width: 768px) {
-          .dashboard-sidebar-panel {
-            display: none !important;
-          }
-          .dashboard-content-wrapper {
-            margin-left: 0 !important;
-            padding-bottom: 74px !important;
-          }
-          .mobile-bottom-tabs {
-            display: flex !important;
-          }
-          .explore-main-grid {
-            grid-template-columns: 1fr !important;
-          }
-        }
-      `}} />
 
     </div>
   );
