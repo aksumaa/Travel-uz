@@ -3,15 +3,16 @@ import { Canvas } from '@react-three/fiber';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Search, MapPin, Sparkles, Navigation, X, Plus, Minus, Crosshair, Play, ChevronRight, Compass } from '../icons';
 import { CountryInfoPanel } from './CountryInfoPanel';
-import type { CountryData } from './CountryInfoPanel';
-import { GlobeScene, COUNTRIES } from './GlobeScene';
-import type { GlobeCountryData } from './GlobeScene';
+import { GlobeScene, COUNTRIES, type CountryData, type GlobeCountryData } from './GlobeScene';
+import { GlobalSearch } from './ui/GlobalSearch';
 import { 
   DESTINATIONS_CATALOG, 
   type DestinationItem, 
   resolveDestination, 
   getDestinationSuggestions 
 } from '../services/destinationCatalog';
+import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 
 export type { CountryData, GlobeCountryData, DestinationItem };
 export { COUNTRIES };
@@ -59,7 +60,10 @@ const FallbackGlobeView: React.FC<{
   activeDestination: DestinationItem | null;
   onDestinationSelect: (dest: DestinationItem) => void;
   autoRotate?: boolean;
-}> = ({ activeDestination, onDestinationSelect, autoRotate = true }) => {
+  theme?: 'light' | 'dark';
+}> = ({ activeDestination, onDestinationSelect, autoRotate = true, theme = 'dark' }) => {
+  const isLight = theme === 'light';
+
   return (
     <div style={{
       position: 'absolute',
@@ -67,7 +71,9 @@ const FallbackGlobeView: React.FC<{
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'radial-gradient(circle at 50% 50%, rgba(14, 165, 233, 0.08) 0%, rgba(15, 23, 42, 0) 70%)',
+      background: isLight 
+        ? 'radial-gradient(circle at 50% 50%, rgba(37, 99, 235, 0.05) 0%, rgba(241, 245, 249, 0.8) 70%)'
+        : 'radial-gradient(circle at 50% 50%, rgba(14, 165, 233, 0.08) 0%, rgba(15, 23, 42, 0) 70%)',
       pointerEvents: 'auto'
     }}>
       <div style={{
@@ -75,9 +81,13 @@ const FallbackGlobeView: React.FC<{
         width: 'min(380px, 80vw)',
         height: 'min(380px, 80vw)',
         borderRadius: '50%',
-        background: 'radial-gradient(circle at 35% 35%, #1e293b 0%, #090d1a 100%)',
-        border: '1px solid rgba(56, 189, 248, 0.25)',
-        boxShadow: '0 0 60px rgba(14, 165, 233, 0.2), inset 0 0 40px rgba(37, 99, 235, 0.3)',
+        background: isLight 
+          ? 'radial-gradient(circle at 35% 35%, #e2e8f0 0%, #cbd5e1 100%)'
+          : 'radial-gradient(circle at 35% 35%, #1e293b 0%, #090d1a 100%)',
+        border: isLight ? '1px solid rgba(37, 99, 235, 0.25)' : '1px solid rgba(56, 189, 248, 0.25)',
+        boxShadow: isLight 
+          ? '0 0 50px rgba(37, 99, 235, 0.15), inset 0 0 30px rgba(37, 99, 235, 0.1)'
+          : '0 0 60px rgba(14, 165, 233, 0.2), inset 0 0 40px rgba(37, 99, 235, 0.3)',
         overflow: 'hidden',
         display: 'flex',
         alignItems: 'center',
@@ -88,26 +98,30 @@ const FallbackGlobeView: React.FC<{
           position: 'absolute',
           inset: '-15%',
           borderRadius: '50%',
-          border: '1px dashed rgba(56, 189, 248, 0.2)',
+          border: isLight ? '1px dashed rgba(37, 99, 235, 0.2)' : '1px dashed rgba(56, 189, 248, 0.2)',
           animation: autoRotate ? 'spin 40s linear infinite' : 'none'
         }} />
         <div style={{
           position: 'absolute',
           inset: '10%',
           borderRadius: '50%',
-          border: '1px solid rgba(255, 255, 255, 0.05)'
+          border: isLight ? '1px solid rgba(15, 23, 42, 0.05)' : '1px solid rgba(255, 255, 255, 0.05)'
         }} />
         <div style={{
           position: 'absolute',
           width: '100%',
           height: '1px',
-          background: 'linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.4), transparent)'
+          background: isLight 
+            ? 'linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.3), transparent)'
+            : 'linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.4), transparent)'
         }} />
         <div style={{
           position: 'absolute',
           height: '100%',
           width: '1px',
-          background: 'linear-gradient(180deg, transparent, rgba(56, 189, 248, 0.4), transparent)'
+          background: isLight
+            ? 'linear-gradient(180deg, transparent, rgba(37, 99, 235, 0.3), transparent)'
+            : 'linear-gradient(180deg, transparent, rgba(56, 189, 248, 0.4), transparent)'
         }} />
 
         {/* Global Key Hub Nodes */}
@@ -127,11 +141,15 @@ const FallbackGlobeView: React.FC<{
                 left: `${x}%`,
                 top: `${y}%`,
                 transform: 'translate(-50%, -50%)',
-                background: isSelected ? '#38bdf8' : 'rgba(15, 23, 42, 0.85)',
-                border: isSelected ? '2px solid #ffffff' : '1px solid rgba(56, 189, 248, 0.4)',
+                background: isSelected 
+                  ? (isLight ? '#2563EB' : '#38BDF8') 
+                  : (isLight ? 'rgba(255, 255, 255, 0.9)' : 'rgba(15, 23, 42, 0.85)'),
+                border: isSelected 
+                  ? '2px solid #ffffff' 
+                  : (isLight ? '1px solid rgba(37, 99, 235, 0.3)' : '1px solid rgba(56, 189, 248, 0.4)'),
                 borderRadius: '100px',
                 padding: '4px 8px',
-                color: isSelected ? '#090d1a' : '#ffffff',
+                color: isSelected ? '#ffffff' : (isLight ? '#0F172A' : '#ffffff'),
                 fontSize: '0.68rem',
                 fontWeight: 800,
                 cursor: 'pointer',
@@ -139,7 +157,9 @@ const FallbackGlobeView: React.FC<{
                 alignItems: 'center',
                 gap: '4px',
                 zIndex: 10,
-                boxShadow: isSelected ? '0 0 15px #38bdf8' : '0 2px 8px rgba(0,0,0,0.5)',
+                boxShadow: isSelected 
+                  ? '0 0 15px rgba(37, 99, 235, 0.5)' 
+                  : (isLight ? '0 2px 6px rgba(0,0,0,0.1)' : '0 2px 8px rgba(0,0,0,0.5)'),
                 transition: 'all 0.2s ease'
               }}
             >
@@ -151,10 +171,10 @@ const FallbackGlobeView: React.FC<{
 
         {/* Center telemetry */}
         <div style={{ textAlign: 'center', zIndex: 5, padding: '12px', pointerEvents: 'none' }}>
-          <div style={{ fontSize: '0.62rem', color: '#38bdf8', fontWeight: 800, letterSpacing: '1px', textTransform: 'uppercase' }}>
+          <div style={{ fontSize: '0.62rem', color: isLight ? '#2563EB' : '#38BDF8', fontWeight: 800, letterSpacing: '1px', textTransform: 'uppercase' }}>
             Interactive Telemetry
           </div>
-          <div style={{ fontSize: '0.9rem', color: '#ffffff', fontWeight: 800 }}>
+          <div style={{ fontSize: '0.9rem', color: isLight ? '#0F172A' : '#ffffff', fontWeight: 800 }}>
             {activeDestination?.name || 'Silk Road Hub'}
           </div>
         </div>
@@ -175,6 +195,10 @@ export const Globe3D: React.FC<GlobeProps> = ({
   initialDestinationId = 'uzbekistan',
   onSelectedFeature
 }) => {
+  const { theme } = useTheme();
+  const { t } = useLanguage();
+  const isLight = theme === 'light';
+
   // Mounting state for SSR safety
   const [isMounted, setIsMounted] = useState(false);
 
@@ -250,7 +274,6 @@ export const Globe3D: React.FC<GlobeProps> = ({
   const handleDestinationTransition = (target: DestinationItem) => {
     if (!target) return;
 
-    // Check if we already are at this destination
     if (activeDestination && activeDestination.id === target.id) {
       return;
     }
@@ -280,7 +303,7 @@ export const Globe3D: React.FC<GlobeProps> = ({
     if (autoRotateTimerRef.current) clearTimeout(autoRotateTimerRef.current);
     autoRotateTimerRef.current = setTimeout(() => {
       setAutoRotate(true);
-    }, 4000);
+    }, 4500);
   };
 
   // Close info panel
@@ -302,6 +325,11 @@ export const Globe3D: React.FC<GlobeProps> = ({
 
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
+  // Background styling strictly matching theme requirement
+  const containerBackground = isLight
+    ? 'radial-gradient(circle at 50% 45%, #FFFFFF 0%, #F8FAFC 55%, #E2E8F0 100%)'
+    : 'radial-gradient(circle at 50% 45%, #0B1728 0%, #07111F 65%, #030712 100%)';
+
   return (
     <div
       onPointerDown={triggerAutoRotatePause}
@@ -312,16 +340,16 @@ export const Globe3D: React.FC<GlobeProps> = ({
         height: '100%',
         minHeight: compact ? '320px' : (isMobile ? '380px' : '520px'),
         overflow: 'hidden',
-        background: 'transparent'
+        background: containerBackground,
+        transition: 'background 0.3s ease'
       }}
     >
       {/* INTEGRATED FLOATING SEARCH BAR CONNECTED TO GLOBE */}
       {showSearchBar && (
         <div
-          ref={searchContainerRef}
           style={{
             position: 'absolute',
-            top: '20px',
+            top: '18px',
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 120,
@@ -329,142 +357,16 @@ export const Globe3D: React.FC<GlobeProps> = ({
             maxWidth: '480px'
           }}
         >
-          <form
-            onSubmit={handleSearchSubmit}
-            style={{
-              position: 'relative',
-              display: 'flex',
-              alignItems: 'center',
-              background: 'var(--color-bg-surface, rgba(15, 23, 42, 0.9))',
-              backdropFilter: 'blur(16px)',
-              WebkitBackdropFilter: 'blur(16px)',
-              border: isSearchFocused ? '1px solid #2563EB' : '1px solid rgba(255, 255, 255, 0.14)',
-              borderRadius: '100px',
-              padding: '6px 14px',
-              boxShadow: '0 8px 30px rgba(0, 0, 0, 0.4)',
-              transition: 'all 0.25s ease'
+          <GlobalSearch
+            variant="globe"
+            placeholder={t('hero.searchPlaceholder')}
+            onSelectDestination={(item, dest) => {
+              handleDestinationTransition(dest);
+              if (onSelectCountry) {
+                onSelectCountry(item.countryId || dest.id);
+              }
             }}
-          >
-            <Search size={18} style={{ color: isSearchFocused ? '#60A5FA' : '#94A3B8', marginRight: '10px', flexShrink: 0 }} />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => setIsSearchFocused(true)}
-              placeholder="Search destination (e.g. Uzbekistan, Cappadocia, Paris)..."
-              style={{
-                flex: 1,
-                background: 'transparent',
-                border: 'none',
-                outline: 'none',
-                color: 'var(--color-text-primary, #ffffff)',
-                fontSize: '0.88rem',
-                fontFamily: "'Outfit', sans-serif",
-                fontWeight: 600
-              }}
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#94A3B8',
-                  padding: '4px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center'
-                }}
-              >
-                <X size={14} />
-              </button>
-            )}
-            <button
-              type="submit"
-              style={{
-                marginLeft: '8px',
-                padding: '6px 14px',
-                borderRadius: '100px',
-                background: 'linear-gradient(135deg, #2563EB, #7C3AED)',
-                color: '#ffffff',
-                border: 'none',
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                flexShrink: 0
-              }}
-            >
-              <Navigation size={12} />
-              <span>Fly</span>
-            </button>
-          </form>
-
-          {/* Autocomplete Dropdown */}
-          <AnimatePresence>
-            {isSearchFocused && suggestions.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.18 }}
-                style={{
-                  position: 'absolute',
-                  top: '52px',
-                  left: 0,
-                  right: 0,
-                  background: 'var(--color-bg-surface, rgba(15, 23, 42, 0.95))',
-                  backdropFilter: 'blur(20px)',
-                  WebkitBackdropFilter: 'blur(20px)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  borderRadius: '18px',
-                  padding: '8px',
-                  boxShadow: '0 12px 35px rgba(0, 0, 0, 0.5)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px',
-                  overflow: 'hidden'
-                }}
-              >
-                {suggestions.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => handleDestinationTransition(item)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '10px 14px',
-                      borderRadius: '12px',
-                      background: 'transparent',
-                      border: 'none',
-                      color: 'var(--color-text-primary, #ffffff)',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      transition: 'background 0.15s ease'
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(37, 99, 235, 0.15)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontSize: '1.2rem' }}>{item.flag}</span>
-                      <div>
-                        <strong style={{ display: 'block', fontSize: '0.88rem', fontWeight: 800 }}>{item.name}</strong>
-                        <span style={{ fontSize: '0.72rem', color: '#94A3B8' }}>{item.country} • {item.type}</span>
-                      </div>
-                    </div>
-                    <span style={{ fontSize: '0.7rem', color: '#F59E0B', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
-                      <MapPin size={12} /> View on Globe
-                    </span>
-                  </button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          />
         </div>
       )}
 
@@ -476,17 +378,19 @@ export const Globe3D: React.FC<GlobeProps> = ({
               activeDestination={activeDestination}
               onDestinationSelect={handleDestinationTransition}
               autoRotate={autoRotate}
+              theme={theme}
             />
           }
         >
           <Canvas
             camera={{ position: [0, 0, 5.8], fov: 45 }}
             gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
-            dpr={isMobile ? 1 : Math.min(window.devicePixelRatio, 1.5)}
+            dpr={isMobile ? 1 : Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 1.5)}
             style={{ background: 'transparent', outline: 'none' }}
           >
             <Suspense fallback={null}>
               <GlobeScene
+                theme={theme}
                 activeSelectedId={activeDestination?.id || selectedCountry || selectedCountryId || null}
                 activeDestination={activeDestination}
                 previousDestination={previousDestination}
@@ -520,11 +424,12 @@ export const Globe3D: React.FC<GlobeProps> = ({
           activeDestination={activeDestination}
           onDestinationSelect={handleDestinationTransition}
           autoRotate={false}
+          theme={theme}
         />
       )}
 
-      {/* Top-Left Target Crosshair Button */}
-      <div style={{ position: 'absolute', top: '20px', left: '20px', zIndex: 110 }}>
+      {/* Top-Left Target Crosshair Button (Auto-Rotate / Recenter toggle) */}
+      <div style={{ position: 'absolute', top: '18px', left: '18px', zIndex: 110 }}>
         <button
           onClick={() => {
             setAutoRotate(!autoRotate);
@@ -534,37 +439,39 @@ export const Globe3D: React.FC<GlobeProps> = ({
             width: '36px',
             height: '36px',
             borderRadius: '50%',
-            background: 'var(--color-bg-surface, #ffffff)',
-            border: '1px solid var(--border, rgba(15, 23, 42, 0.1))',
-            color: autoRotate ? '#2563eb' : '#64748b',
+            background: isLight ? 'rgba(255, 255, 255, 0.92)' : 'rgba(15, 23, 42, 0.92)',
+            backdropFilter: 'blur(8px)',
+            border: isLight ? '1px solid rgba(15, 23, 42, 0.12)' : '1px solid rgba(255, 255, 255, 0.12)',
+            color: autoRotate ? '#2563EB' : (isLight ? '#64748B' : '#94A3B8'),
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)'
+            boxShadow: isLight ? '0 2px 8px rgba(0, 0, 0, 0.08)' : '0 2px 10px rgba(0, 0, 0, 0.3)'
           }}
-          title="Target recenter"
+          title={autoRotate ? "Pause auto-rotation" : "Enable auto-rotation"}
         >
           <Crosshair size={18} />
         </button>
       </div>
 
       {/* Top-Right Globe Controls (+, -, Recenter) */}
-      <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 110, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      <div style={{ position: 'absolute', top: '18px', right: '18px', zIndex: 110, display: 'flex', flexDirection: 'column', gap: '6px' }}>
         <button
           onClick={() => setZoomLevel(prev => Math.min(prev * 1.25, 2.2))}
           style={{
             width: '34px',
             height: '34px',
-            borderRadius: '8px',
-            background: 'var(--color-bg-surface, #ffffff)',
-            border: '1px solid var(--border, rgba(15, 23, 42, 0.1))',
-            color: 'var(--color-text-primary, #0f172a)',
+            borderRadius: '10px',
+            background: isLight ? 'rgba(255, 255, 255, 0.92)' : 'rgba(15, 23, 42, 0.92)',
+            backdropFilter: 'blur(8px)',
+            border: isLight ? '1px solid rgba(15, 23, 42, 0.12)' : '1px solid rgba(255, 255, 255, 0.12)',
+            color: isLight ? '#0F172A' : '#F8FAFC',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.06)'
+            boxShadow: isLight ? '0 2px 6px rgba(0, 0, 0, 0.06)' : '0 2px 8px rgba(0, 0, 0, 0.3)'
           }}
           title="Zoom in"
         >
@@ -575,15 +482,16 @@ export const Globe3D: React.FC<GlobeProps> = ({
           style={{
             width: '34px',
             height: '34px',
-            borderRadius: '8px',
-            background: 'var(--color-bg-surface, #ffffff)',
-            border: '1px solid var(--border, rgba(15, 23, 42, 0.1))',
-            color: 'var(--color-text-primary, #0f172a)',
+            borderRadius: '10px',
+            background: isLight ? 'rgba(255, 255, 255, 0.92)' : 'rgba(15, 23, 42, 0.92)',
+            backdropFilter: 'blur(8px)',
+            border: isLight ? '1px solid rgba(15, 23, 42, 0.12)' : '1px solid rgba(255, 255, 255, 0.12)',
+            color: isLight ? '#0F172A' : '#F8FAFC',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.06)'
+            boxShadow: isLight ? '0 2px 6px rgba(0, 0, 0, 0.06)' : '0 2px 8px rgba(0, 0, 0, 0.3)'
           }}
           title="Zoom out"
         >
@@ -597,15 +505,16 @@ export const Globe3D: React.FC<GlobeProps> = ({
           style={{
             width: '34px',
             height: '34px',
-            borderRadius: '8px',
-            background: 'var(--color-bg-surface, #ffffff)',
-            border: '1px solid var(--border, rgba(15, 23, 42, 0.1))',
-            color: 'var(--color-text-primary, #0f172a)',
+            borderRadius: '10px',
+            background: isLight ? 'rgba(255, 255, 255, 0.92)' : 'rgba(15, 23, 42, 0.92)',
+            backdropFilter: 'blur(8px)',
+            border: isLight ? '1px solid rgba(15, 23, 42, 0.12)' : '1px solid rgba(255, 255, 255, 0.12)',
+            color: isLight ? '#0F172A' : '#F8FAFC',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.06)'
+            boxShadow: isLight ? '0 2px 6px rgba(0, 0, 0, 0.06)' : '0 2px 8px rgba(0, 0, 0, 0.3)'
           }}
           title="Recenter Globe"
         >
@@ -623,12 +532,12 @@ export const Globe3D: React.FC<GlobeProps> = ({
           display: 'flex',
           alignItems: 'center',
           gap: '6px',
-          background: 'rgba(255, 255, 255, 0.9)',
+          background: isLight ? 'rgba(255, 255, 255, 0.92)' : 'rgba(15, 23, 42, 0.92)',
           backdropFilter: 'blur(10px)',
           padding: '5px 8px',
-          borderRadius: '12px',
-          border: '1px solid rgba(15, 23, 42, 0.08)',
-          boxShadow: '0 4px 14px rgba(0, 0, 0, 0.08)'
+          borderRadius: '14px',
+          border: isLight ? '1px solid rgba(15, 23, 42, 0.1)' : '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: isLight ? '0 4px 14px rgba(0, 0, 0, 0.08)' : '0 4px 16px rgba(0, 0, 0, 0.35)'
         }}>
           <button
             onClick={() => setAutoRotate(!autoRotate)}
@@ -636,7 +545,7 @@ export const Globe3D: React.FC<GlobeProps> = ({
               width: '26px',
               height: '26px',
               borderRadius: '50%',
-              background: '#2563eb',
+              background: '#2563EB',
               color: '#ffffff',
               border: 'none',
               display: 'flex',
@@ -644,7 +553,7 @@ export const Globe3D: React.FC<GlobeProps> = ({
               justifyContent: 'center',
               cursor: 'pointer'
             }}
-            title="Play auto tour"
+            title="Auto rotation"
           >
             <Play size={10} fill="#ffffff" />
           </button>
@@ -656,9 +565,10 @@ export const Globe3D: React.FC<GlobeProps> = ({
                 height: '30px',
                 borderRadius: '6px',
                 overflow: 'hidden',
-                border: idx === 0 ? '2px solid #2563eb' : '1px solid rgba(0, 0, 0, 0.1)',
+                border: idx === 0 ? '2px solid #2563EB' : (isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.15)'),
                 cursor: 'pointer'
               }}
+              title={item.name}
             >
               <img src={item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
@@ -673,9 +583,9 @@ export const Globe3D: React.FC<GlobeProps> = ({
               width: '22px',
               height: '22px',
               borderRadius: '50%',
-              background: 'rgba(15, 23, 42, 0.06)',
+              background: isLight ? 'rgba(15, 23, 42, 0.06)' : 'rgba(255, 255, 255, 0.08)',
               border: 'none',
-              color: '#0f172a',
+              color: isLight ? '#0F172A' : '#F8FAFC',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -702,25 +612,25 @@ export const Globe3D: React.FC<GlobeProps> = ({
             maxWidth: '280px',
             padding: '10px 16px',
             borderRadius: '16px',
-            background: 'rgba(15, 23, 42, 0.9)',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+            background: isLight ? 'rgba(255, 255, 255, 0.94)' : 'rgba(15, 23, 42, 0.92)',
+            border: isLight ? '1px solid rgba(15, 23, 42, 0.12)' : '1px solid rgba(255, 255, 255, 0.12)',
+            boxShadow: isLight ? '0 8px 24px rgba(0, 0, 0, 0.1)' : '0 8px 32px rgba(0, 0, 0, 0.4)',
             backdropFilter: 'blur(12px)',
             WebkitBackdropFilter: 'blur(12px)',
             textAlign: 'center',
-            color: '#ffffff',
+            color: isLight ? '#0F172A' : '#ffffff',
             display: 'flex',
             flexDirection: 'column',
             gap: '2px'
           }}
         >
-          <span style={{ fontSize: '0.65rem', color: '#60A5FA', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+          <span style={{ fontSize: '0.65rem', color: isLight ? '#2563EB' : '#60A5FA', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
             {hoveredCountryFeature.properties.SUBREGION || hoveredCountryFeature.properties.CONTINENT}
           </span>
           <h4 style={{ fontSize: '1rem', fontWeight: 800, margin: 0, fontFamily: "'Outfit', sans-serif" }}>
             {hoveredCountryFeature.properties.NAME}
           </h4>
-          <span style={{ fontSize: '0.62rem', color: '#94A3B8', marginTop: '2px' }}>
+          <span style={{ fontSize: '0.62rem', color: isLight ? '#64748B' : '#94A3B8', marginTop: '2px' }}>
             Click country to inspect telemetry
           </span>
         </div>
@@ -737,25 +647,25 @@ export const Globe3D: React.FC<GlobeProps> = ({
             bottom: '24px',
             left: '24px',
             zIndex: 100,
-            background: 'rgba(15, 23, 42, 0.88)',
-            border: '1px solid rgba(56, 189, 248, 0.4)',
+            background: isLight ? 'rgba(255, 255, 255, 0.95)' : 'rgba(15, 23, 42, 0.88)',
+            border: isLight ? '1px solid rgba(37, 99, 235, 0.3)' : '1px solid rgba(56, 189, 248, 0.4)',
             backdropFilter: 'blur(12px)',
             padding: '8px 16px',
             borderRadius: '100px',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.35)'
+            boxShadow: isLight ? '0 4px 16px rgba(0,0,0,0.1)' : '0 4px 20px rgba(0,0,0,0.35)'
           }}
         >
-          <Sparkles size={14} style={{ color: '#38BDF8' }} />
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ffffff' }}>
-            Flight in progress: <strong style={{ color: '#38BDF8' }}>{previousDestination.name}</strong> ➔ <strong style={{ color: '#F59E0B' }}>{activeDestination.name}</strong>
+          <Sparkles size={14} style={{ color: isLight ? '#2563EB' : '#38BDF8' }} />
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: isLight ? '#0F172A' : '#ffffff' }}>
+            Flight in progress: <strong style={{ color: isLight ? '#2563EB' : '#38BDF8' }}>{previousDestination.name}</strong> ➔ <strong style={{ color: '#F59E0B' }}>{activeDestination.name}</strong>
           </span>
         </motion.div>
       )}
 
-      {/* Selected Country / Destination Detail Panel Overlay */}
+      {/* Selected Country / Destination Detail Panel Overlay (when not compact) */}
       {!compact && (
         <AnimatePresence>
           {activeDestination && (

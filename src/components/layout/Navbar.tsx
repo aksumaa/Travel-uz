@@ -61,14 +61,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
   };
 
   const getLanguageDetails = (lang: Language) => {
-    switch (lang.toLowerCase()) {
+    switch (lang?.toLowerCase()) {
       case 'uz':
         return { flag: '🇺🇿', code: 'UZ', label: 'O‘zbekcha' };
       case 'ru':
         return { flag: '🇷🇺', code: 'RU', label: 'Русский' };
       case 'en':
       default:
-        return { flag: '🇬🇧', code: 'EN', label: 'English' };
+        return { flag: '🇺🇸', code: 'EN', label: 'English' };
     }
   };
 
@@ -81,6 +81,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
       router.push('/');
     }
   };
+
+  const navLinks = [
+    { label: t('nav.destinations'), href: '#destinations' },
+    { label: t('nav.planner'), href: '#ai-planner' },
+    { label: t('nav.howItWorks'), href: '#how-it-works' },
+    { label: t('nav.about'), href: '#why-tripmind' },
+    { label: t('nav.faq'), href: '#faq' }
+  ];
 
   return (
     <motion.header
@@ -125,13 +133,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
         <span
           style={{
             fontFamily: "'Outfit', sans-serif",
-            fontWeight: 800,
+            fontWeight: 900,
             fontSize: '1.35rem',
-            letterSpacing: '0.5px',
+            letterSpacing: '1px',
             color: 'var(--text-primary)',
+            textTransform: 'uppercase'
           }}
         >
-          Trip<span style={{ color: '#2563EB', fontWeight: 900 }}>Mind</span>
+          TRIP<span style={{ color: '#2563EB' }}>MIND</span>
         </span>
       </div>
 
@@ -141,71 +150,36 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '24px',
+          gap: '28px',
         }}
       >
-        <button
-          onClick={() => router.push('/dashboard')}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            fontSize: '0.88rem',
-            fontWeight: 700,
-            color: 'var(--text-secondary)',
-            cursor: 'pointer',
-            transition: 'color 0.2s',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = '#2563eb')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-secondary)')}
-        >
-          <LayoutDashboard size={15} />
-          <span>Traveler</span>
-        </button>
-
-        <button
-          onClick={() => router.push('/agency/dashboard')}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            fontSize: '0.88rem',
-            fontWeight: 700,
-            color: 'var(--text-secondary)',
-            cursor: 'pointer',
-            transition: 'color 0.2s',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = '#2563eb')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-secondary)')}
-        >
-          <Building2 size={15} />
-          <span>Agency</span>
-        </button>
-
-        <button
-          onClick={() => router.push('/admin')}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            fontSize: '0.88rem',
-            fontWeight: 700,
-            color: 'var(--text-secondary)',
-            cursor: 'pointer',
-            transition: 'color 0.2s',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = '#2563eb')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-secondary)')}
-        >
-          <Shield size={15} />
-          <span>Admin</span>
-        </button>
+        {navLinks.map((item) => (
+          <a
+            key={item.href}
+            href={item.href}
+            onClick={(e) => {
+              if (window.location.pathname === '/' || window.location.pathname === '') {
+                const el = document.querySelector(item.href);
+                if (el) {
+                  e.preventDefault();
+                  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }
+            }}
+            style={{
+              textDecoration: 'none',
+              fontSize: '0.88rem',
+              fontWeight: 700,
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              transition: 'color 0.2s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = '#2563eb')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-secondary)')}
+          >
+            {item.label}
+          </a>
+        ))}
       </nav>
 
       {/* Right: Controls Panel */}
@@ -298,6 +272,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
         {/* Language dropdown */}
         <div ref={langRef} style={{ position: 'relative' }}>
           <button
+            id="lang-selector-button"
             onClick={() => setIsLangDropdownOpen(!isLangDropdownOpen)}
             style={{
               display: 'flex',
@@ -315,7 +290,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
               transition: 'all 0.2s',
             }}
           >
-            <span style={{ fontSize: '0.95rem' }}>{currentLangDetails.flag}</span>
+            <span style={{ fontSize: '1rem' }}>{currentLangDetails.flag}</span>
             <span>{currentLangDetails.code}</span>
             <ChevronDown size={13} style={{ opacity: 0.6 }} />
           </button>
@@ -332,7 +307,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
                   position: 'absolute',
                   top: '46px',
                   right: 0,
-                  width: '140px',
+                  width: '150px',
                   padding: '6px',
                   display: 'flex',
                   flexDirection: 'column',
@@ -344,12 +319,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
                   borderRadius: '12px'
                 }}
               >
-                {(['uz', 'ru', 'en'] as Language[]).map((lang) => {
+                {(['en', 'uz', 'ru'] as Language[]).map((lang) => {
                   const details = getLanguageDetails(lang);
-                  const isSelected = language.toLowerCase() === lang.toLowerCase();
+                  const isSelected = (language || 'en').toLowerCase() === lang.toLowerCase();
                   return (
                     <button
                       key={lang}
+                      id={`lang-option-${lang}`}
                       onClick={() => changeLanguage(lang)}
                       style={{
                         width: '100%',
@@ -357,9 +333,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
                         borderRadius: '8px',
                         textAlign: 'left',
                         fontSize: '0.82rem',
-                        fontWeight: 600,
+                        fontWeight: isSelected ? 800 : 600,
                         color: isSelected ? 'var(--accent, #2563eb)' : 'var(--text-secondary)',
-                        background: isSelected ? 'rgba(37, 99, 235, 0.08)' : 'transparent',
+                        background: isSelected ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
@@ -367,8 +343,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
                         cursor: 'pointer'
                       }}
                     >
-                      <span>{details.flag}</span>
-                      <span>{details.label}</span>
+                      <span style={{ fontSize: '1rem' }}>{details.flag}</span>
+                      <span>{details.code} - {details.label}</span>
                     </button>
                   );
                 })}
@@ -393,7 +369,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
             transition: 'all 0.2s',
             cursor: 'pointer'
           }}
-          title="Toggle Theme"
+          title={theme === 'dark' ? t('nav.lightMode') : t('nav.darkMode')}
         >
           {theme === 'dark' ? (
             <Moon size={16} style={{ color: 'var(--text-primary)' }} />
@@ -481,7 +457,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
                       }}
                     >
                       <LayoutDashboard size={14} />
-                      <span>Traveler Dashboard</span>
+                      <span>{t('nav.dashboard')}</span>
                     </button>
                     <button
                       onClick={() => {
@@ -505,7 +481,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
                       }}
                     >
                       <Building2 size={14} />
-                      <span>Agency Portal</span>
+                      <span>{t('nav.agencyPortal')}</span>
                     </button>
                     <button
                       onClick={() => {
@@ -529,7 +505,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
                       }}
                     >
                       <Shield size={14} />
-                      <span>Admin Console</span>
+                      <span>{t('nav.adminConsole')}</span>
                     </button>
                     <div style={{ height: '1px', background: 'var(--border)', margin: '4px 0' }} />
                     <button
@@ -555,7 +531,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
                       }}
                     >
                       <LogOut size={14} />
-                      <span>Sign Out</span>
+                      <span>{t('nav.signOut')}</span>
                     </button>
                   </motion.div>
                 )}
@@ -564,11 +540,33 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
           ) : (
             <div style={{ display: 'flex', gap: '8px' }}>
               <button
-                onClick={() => router.push('/dashboard')}
+                onClick={() => {
+                  setShowAuthModal(true);
+                }}
                 className="btn-primary"
-                style={{ padding: '8px 16px', borderRadius: '10px', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer' }}
+                style={{
+                  padding: '9px 18px',
+                  borderRadius: '12px',
+                  fontSize: '0.84rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  background: 'linear-gradient(135deg, #2563EB, #7C3AED)',
+                  color: '#ffffff',
+                  border: 'none',
+                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
+                  transition: 'all 0.2s ease',
+                  letterSpacing: '0.2px'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(37, 99, 235, 0.5)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 14px rgba(37, 99, 235, 0.35)';
+                }}
               >
-                Open Dashboard
+                {t('nav.getStarted')}
               </button>
             </div>
           )}
@@ -611,30 +609,97 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateHome }) => {
               background: 'var(--color-bg-surface, #ffffff)',
               borderBottom: '1px solid var(--border)',
               zIndex: 999,
-              padding: '20px',
+              padding: '24px 20px',
               display: 'flex',
               flexDirection: 'column',
               gap: '12px',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.15)'
+              boxShadow: '0 12px 35px rgba(0,0,0,0.2)'
             }}
           >
+            {navLinks.map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                onClick={(e) => {
+                  setIsMobileMenuOpen(false);
+                  const el = document.querySelector(item.href);
+                  if (el) {
+                    e.preventDefault();
+                    el.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                style={{
+                  padding: '12px 16px',
+                  borderRadius: '10px',
+                  textDecoration: 'none',
+                  color: 'var(--text-primary)',
+                  fontWeight: 700,
+                  fontSize: '0.95rem',
+                  background: 'rgba(37, 99, 235, 0.05)',
+                  border: '1px solid var(--border)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}
+              >
+                <span>{item.label}</span>
+                <span style={{ color: '#2563EB', fontSize: '0.85rem' }}>→</span>
+              </a>
+            ))}
+
+            {/* Mobile Language Selector */}
+            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+              {(['en', 'uz', 'ru'] as Language[]).map((lang) => {
+                const details = getLanguageDetails(lang);
+                const isSelected = (language || 'en').toLowerCase() === lang.toLowerCase();
+                return (
+                  <button
+                    key={lang}
+                    onClick={() => {
+                      changeLanguage(lang);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '10px',
+                      borderRadius: '10px',
+                      border: isSelected ? '2px solid #2563EB' : '1px solid var(--border)',
+                      background: isSelected ? 'rgba(37, 99, 235, 0.1)' : 'var(--color-bg)',
+                      color: isSelected ? '#2563EB' : 'var(--text-primary)',
+                      fontSize: '0.85rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <span>{details.flag}</span>
+                    <span>{details.code}</span>
+                  </button>
+                );
+              })}
+            </div>
+
             <button
-              onClick={() => { setIsMobileMenuOpen(false); router.push('/dashboard'); }}
-              style={{ padding: '12px', borderRadius: '10px', background: 'rgba(37,99,235,0.08)', color: '#2563eb', border: 'none', fontWeight: 700, textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px' }}
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                setShowAuthModal(true);
+              }}
+              style={{
+                marginTop: '8px',
+                padding: '14px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #2563EB, #7C3AED)',
+                color: '#ffffff',
+                border: 'none',
+                fontWeight: 800,
+                fontSize: '0.95rem',
+                cursor: 'pointer',
+                textAlign: 'center'
+              }}
             >
-              <LayoutDashboard size={16} /> Traveler Dashboard
-            </button>
-            <button
-              onClick={() => { setIsMobileMenuOpen(false); router.push('/agency/dashboard'); }}
-              style={{ padding: '12px', borderRadius: '10px', background: 'rgba(124,58,237,0.08)', color: '#7c3aed', border: 'none', fontWeight: 700, textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px' }}
-            >
-              <Building2 size={16} /> Agency Portal
-            </button>
-            <button
-              onClick={() => { setIsMobileMenuOpen(false); router.push('/admin'); }}
-              style={{ padding: '12px', borderRadius: '10px', background: 'rgba(16,185,129,0.08)', color: '#10b981', border: 'none', fontWeight: 700, textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px' }}
-            >
-              <Shield size={16} /> Admin Console
+              {t('nav.getStarted')}
             </button>
           </motion.div>
         )}

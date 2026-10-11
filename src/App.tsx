@@ -16,7 +16,7 @@ const PublicItineraryView = lazy(() => import('./components/PublicItineraryView'
 
 function AppContent() {
   const [isLoading, setIsLoading] = useState(true);
-  const [dashboardView, setDashboardView] = useState('home');
+  const [dashboardView, setDashboardView] = useState('landing');
   const { user } = useAuth();
 
   // Check public itinerary link

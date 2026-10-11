@@ -48,7 +48,7 @@ export class ErrorBoundary extends Component<Props, State> {
             overflowX: 'auto',
             color: '#f87171'
           }}>
-            {this.state.error?.toString()}
+            {this.state.error?.stack || this.state.error?.toString()}
           </pre>
           <button
             onClick={() => window.location.reload()}

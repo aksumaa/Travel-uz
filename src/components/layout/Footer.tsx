@@ -61,13 +61,14 @@ export const Footer: React.FC = () => {
             <span
               style={{
                 fontFamily: "'Outfit', sans-serif",
-                fontWeight: 800,
+                fontWeight: 900,
                 fontSize: '1.25rem',
                 letterSpacing: '1px',
                 color: 'var(--text-primary)',
+                textTransform: 'uppercase'
               }}
             >
-              Trip<span style={{ color: '#2563EB', fontWeight: 900 }}>Mind</span>
+              TRIP<span style={{ color: '#2563EB' }}>MIND</span>
             </span>
           </div>
           <p style={{ fontSize: '0.85rem', lineHeight: 1.6, maxWidth: '280px', color: 'var(--text-muted)' }}>
@@ -209,8 +210,10 @@ export const Footer: React.FC = () => {
             </li>
             <li>
               <a href="/admin" style={{ color: 'inherit', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent)')} onMouseLeave={(e) => (e.currentTarget.style.color = 'inherit')}>
-                Admin panel
+                {t('footer.adminPanel')}
               </a>
+            </li>
+            <li>
               <a href="#careers" style={{ color: 'inherit', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent)')} onMouseLeave={(e) => (e.currentTarget.style.color = 'inherit')}>
                 {t('footer.careers')}
               </a>
@@ -361,7 +364,7 @@ export const Footer: React.FC = () => {
           onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent)')}
           onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
         >
-          <span>Scroll to Top</span>
+          <span>{t('footer.scrollToTop')}</span>
           <ArrowUpRight size={14} />
         </button>
       </div>

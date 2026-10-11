@@ -3,9 +3,30 @@ import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Stars, useTexture, Html } from '@react-three/drei';
 import gsap from 'gsap';
-import type { CountryData } from './CountryInfoPanel';
-import { DESTINATIONS_CATALOG, type DestinationItem, resolveDestination, generateDestinationForCountry } from '../services/destinationCatalog';
+import { 
+  DESTINATIONS_CATALOG, 
+  type DestinationItem, 
+  resolveDestination, 
+  generateDestinationForCountry 
+} from '../services/destinationCatalog';
 import { FlightPathAnimation, toXYZ } from './FlightPathAnimation';
+
+export interface CountryData {
+  name: string;
+  capital: string;
+  language: string;
+  currency: string;
+  timezone: string;
+  population: string;
+  area: string;
+  flag: string;
+  weather: { temp: number; condition: string };
+  visa: string;
+  bestTime: string;
+  description: string;
+  attractions: Array<{ name: string; city: string; image: string }>;
+  foods: Array<{ name: string; image: string }>;
+}
 
 export interface GlobeCountryData extends CountryData {
   id: string;
@@ -56,7 +77,10 @@ const CITIES: City[] = [
   { name: 'Paris', lat: 48.8566, lng: 2.3522, type: 'popular' },
   { name: 'Tokyo', lat: 35.6762, lng: 139.6503, type: 'popular' },
   { name: 'New York', lat: 40.7128, lng: -74.006, type: 'popular' },
-  { name: 'Cairo', lat: 30.0444, lng: 31.2357, type: 'popular' }
+  { name: 'Cairo', lat: 30.0444, lng: 31.2357, type: 'popular' },
+  { name: 'Rome', lat: 41.9028, lng: 12.4964, type: 'popular' },
+  { name: 'Bangkok', lat: 13.7563, lng: 100.5018, type: 'popular' },
+  { name: 'Sydney', lat: -33.8688, lng: 151.2093, type: 'popular' }
 ];
 
 export { toXYZ };
@@ -113,11 +137,40 @@ function calculateBBox(geometry: any): [number, number, number, number] {
   return [minLon, minLat, maxLon, maxLat];
 }
 
-const getResponsiveSegments = () => (typeof window !== 'undefined' && window.innerWidth < 768 ? 40 : 64);
+const getResponsiveSegments = () => (typeof window !== 'undefined' && window.innerWidth < 768 ? 48 : 64);
+
+/**
+ * Procedural soft radial gradient texture for the contact shadow underneath the globe in light mode.
+ */
+function createContactShadowTexture(): THREE.CanvasTexture | null {
+  if (typeof document === 'undefined') return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+    gradient.addColorStop(0, 'rgba(15, 23, 42, 0.42)');
+    gradient.addColorStop(0.3, 'rgba(15, 23, 42, 0.22)');
+    gradient.addColorStop(0.65, 'rgba(15, 23, 42, 0.06)');
+    gradient.addColorStop(1, 'rgba(15, 23, 42, 0)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 256, 256);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  return texture;
+}
 
 // Subtle Realistic Rayleigh-inspired Atmosphere
-const Atmosphere: React.FC = () => {
+interface AtmosphereProps {
+  theme?: 'light' | 'dark';
+}
+
+const Atmosphere: React.FC<AtmosphereProps> = ({ theme = 'dark' }) => {
   const segments = useMemo(() => getResponsiveSegments(), []);
+  const isLight = theme === 'light';
+
   const vertexShader = `
     varying vec3 vNormal;
     void main() {
@@ -126,17 +179,25 @@ const Atmosphere: React.FC = () => {
     }
   `;
 
-  const fragmentShader = `
-    varying vec3 vNormal;
-    void main() {
-      float intensity = pow(0.65 - dot(vNormal, vec3(0,0,1.0)), 2.2);
-      gl_FragColor = vec4(0.2, 0.45, 0.9, 0.75) * intensity;
-    }
-  `;
+  const fragmentShader = isLight
+    ? `
+      varying vec3 vNormal;
+      void main() {
+        float intensity = pow(0.62 - dot(vNormal, vec3(0, 0, 1.0)), 2.4);
+        gl_FragColor = vec4(0.3, 0.6, 0.95, 0.45) * intensity;
+      }
+    `
+    : `
+      varying vec3 vNormal;
+      void main() {
+        float intensity = pow(0.65 - dot(vNormal, vec3(0, 0, 1.0)), 2.0);
+        gl_FragColor = vec4(0.2, 0.5, 0.95, 0.8) * intensity;
+      }
+    `;
 
   return (
     <mesh>
-      <sphereGeometry args={[2.57, segments, segments]} />
+      <sphereGeometry args={[2.58, segments, segments]} />
       <shaderMaterial
         vertexShader={vertexShader}
         fragmentShader={fragmentShader}
@@ -150,14 +211,18 @@ const Atmosphere: React.FC = () => {
 };
 
 // Realistic Cloud Layer with Gentle Spin
-const Clouds: React.FC = () => {
+interface CloudsProps {
+  theme?: 'light' | 'dark';
+}
+
+const Clouds: React.FC<CloudsProps> = ({ theme = 'dark' }) => {
   const cloudsRef = useRef<THREE.Mesh>(null);
   const cloudsTexture = useTexture('/textures/earth_clouds.jpg');
   const segments = useMemo(() => getResponsiveSegments(), []);
 
   useFrame(() => {
     if (cloudsRef.current) {
-      cloudsRef.current.rotation.y += 0.00025;
+      cloudsRef.current.rotation.y += 0.0002;
     }
   });
 
@@ -167,15 +232,16 @@ const Clouds: React.FC = () => {
       <meshPhongMaterial
         map={cloudsTexture}
         transparent={true}
-        opacity={0.35}
+        opacity={theme === 'light' ? 0.32 : 0.38}
         depthWrite={false}
       />
     </mesh>
   );
 };
 
-// Earth Base Sphere with NASA Blue Marble & Normal Maps
+// Earth Base Sphere with NASA Blue Marble, Specular & Normal Maps
 interface EarthMeshProps {
+  theme?: 'light' | 'dark';
   onPointerMove: (e: any) => void;
   onPointerOut: () => void;
   onPointerDown: (e: any) => void;
@@ -184,7 +250,12 @@ interface EarthMeshProps {
 }
 
 const EarthMesh: React.FC<EarthMeshProps> = ({ 
-  onPointerMove, onPointerOut, onPointerDown, onPointerUp, earthRef 
+  theme = 'dark',
+  onPointerMove, 
+  onPointerOut, 
+  onPointerDown, 
+  onPointerUp, 
+  earthRef 
 }) => {
   const segments = useMemo(() => getResponsiveSegments(), []);
   const textures = useTexture({
@@ -192,6 +263,12 @@ const EarthMesh: React.FC<EarthMeshProps> = ({
     normalMap: '/textures/earth_normal.jpg',
     specularMap: '/textures/earth_specular.jpg'
   });
+
+  const normalScale = useMemo(() => new THREE.Vector2(0.85, 0.85), []);
+  const specularColor = useMemo(
+    () => new THREE.Color(theme === 'light' ? 0x223344 : 0x446688),
+    [theme]
+  );
 
   return (
     <mesh
@@ -205,31 +282,46 @@ const EarthMesh: React.FC<EarthMeshProps> = ({
       <meshPhongMaterial
         map={textures.map}
         normalMap={textures.normalMap}
+        normalScale={normalScale}
         specularMap={textures.specularMap}
-        shininess={18}
+        specular={specularColor}
+        shininess={24}
       />
     </mesh>
   );
 };
 
-// Dedicated Accurate Destination Marker Component
+// Dedicated Accurate Destination Marker Component with Photo Preview + Name
 interface DestinationMarkerProps {
   destination: DestinationItem;
   isFocused?: boolean;
+  theme?: 'light' | 'dark';
+  onClick?: () => void;
 }
 
-const DestinationMarker: React.FC<DestinationMarkerProps> = ({ destination, isFocused = true }) => {
+const DestinationMarker: React.FC<DestinationMarkerProps> = ({ 
+  destination, 
+  isFocused = true, 
+  theme = 'dark',
+  onClick 
+}) => {
   const ringRef = useRef<THREE.Mesh>(null);
-  const pos = useMemo(() => toXYZ(destination.lat, destination.lng, 2.52), [destination.lat, destination.lng]);
+  const pos = useMemo(() => toXYZ(destination.lat, destination.lng, 2.522), [destination.lat, destination.lng]);
+  const isLight = theme === 'light';
+
+  // Preview thumbnail photo
+  const photoUrl = destination.popularDestinations?.[0]?.image || 
+                   destination.places?.[0]?.imageUrl || 
+                   'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=400&q=80';
 
   useFrame((state) => {
     if (ringRef.current) {
       const elapsed = state.clock.getElapsedTime();
-      const scale = 1.0 + (elapsed * 2.2) % 2.0;
-      const opacity = 1.0 - (scale - 1.0) / 2.0;
+      const scale = 1.0 + (elapsed * 2.0) % 1.8;
+      const opacity = 1.0 - (scale - 1.0) / 1.8;
       ringRef.current.scale.setScalar(scale);
       if (ringRef.current.material) {
-        (ringRef.current.material as THREE.Material).opacity = opacity;
+        (ringRef.current.material as THREE.Material).opacity = Math.max(0, opacity * 0.75);
       }
     }
   });
@@ -244,44 +336,95 @@ const DestinationMarker: React.FC<DestinationMarkerProps> = ({ destination, isFo
       }}>
         {/* Core Pin Needle */}
         <mesh position={[0, 0, 0.04]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.008, 0.003, 0.08, 12]} />
+          <cylinderGeometry args={[0.007, 0.002, 0.08, 12]} />
           <meshBasicMaterial color="#F59E0B" />
         </mesh>
 
-        {/* Top Bead */}
-        <mesh position={[0, 0, 0.08]}>
+        {/* Top Glowing Bead */}
+        <mesh 
+          position={[0, 0, 0.08]}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onClick) onClick();
+          }}
+        >
           <sphereGeometry args={[0.035, 16, 16]} />
-          <meshStandardMaterial color="#F59E0B" emissive="#F59E0B" emissiveIntensity={0.6} />
+          <meshStandardMaterial color="#F59E0B" emissive="#F59E0B" emissiveIntensity={0.7} />
         </mesh>
 
-        {/* Pulsing Radar Ring */}
+        {/* Pulsing Radar Ring on Globe Surface */}
         <mesh ref={ringRef} position={[0, 0, 0.002]}>
-          <ringGeometry args={[0.04, 0.08, 32]} />
-          <meshBasicMaterial color="#F59E0B" transparent opacity={0.8} depthWrite={false} />
+          <ringGeometry args={[0.04, 0.085, 32]} />
+          <meshBasicMaterial color="#F59E0B" transparent opacity={0.75} depthWrite={false} />
         </mesh>
 
-        {/* Floating Label */}
+        {/* Premium Floating Card Label with Photo + Flag + Name */}
         {isFocused && (
-          <Html distanceFactor={4.5} center position={[0, 0.16, 0]}>
-            <div style={{
-              background: 'rgba(15, 23, 42, 0.92)',
-              color: '#ffffff',
-              padding: '6px 12px',
-              borderRadius: '20px',
-              border: '1px solid rgba(245, 158, 11, 0.5)',
-              fontSize: '0.75rem',
-              fontWeight: 800,
-              whiteSpace: 'nowrap',
-              fontFamily: "'Outfit', sans-serif",
-              backdropFilter: 'blur(8px)',
-              pointerEvents: 'none',
-              boxShadow: '0 6px 16px rgba(0,0,0,0.4)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}>
-              <span>{destination.flag}</span>
-              <span style={{ color: '#F59E0B' }}>{destination.name}</span>
+          <Html distanceFactor={4.6} center position={[0, 0.22, 0]}>
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onClick) onClick();
+              }}
+              style={{
+                background: isLight ? 'rgba(255, 255, 255, 0.94)' : 'rgba(15, 23, 42, 0.94)',
+                color: isLight ? '#0F172A' : '#FFFFFF',
+                padding: '6px 10px 6px 6px',
+                borderRadius: '14px',
+                border: isLight ? '1px solid rgba(245, 158, 11, 0.6)' : '1px solid rgba(245, 158, 11, 0.5)',
+                boxShadow: isLight ? '0 10px 25px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(245, 158, 11, 0.15)' : '0 10px 25px rgba(0, 0, 0, 0.5), 0 0 15px rgba(245, 158, 11, 0.2)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                pointerEvents: 'auto',
+                cursor: 'pointer',
+                fontFamily: "'Outfit', 'Inter', sans-serif",
+                transform: 'translateZ(0)',
+                userSelect: 'none',
+                minWidth: '140px'
+              }}
+            >
+              {/* Photo Thumbnail */}
+              <div style={{
+                width: '34px',
+                height: '34px',
+                borderRadius: '10px',
+                overflow: 'hidden',
+                flexShrink: 0,
+                border: '1px solid rgba(245, 158, 11, 0.4)',
+                background: '#0F172A'
+              }}>
+                <img
+                  src={photoUrl}
+                  alt={destination.name}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              </div>
+
+              {/* Text Info */}
+              <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', lineHeight: 1.2 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '0.85rem' }}>{destination.flag}</span>
+                  <span style={{
+                    fontSize: '0.82rem',
+                    fontWeight: 800,
+                    color: isLight ? '#0F172A' : '#FFFFFF',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {destination.name}
+                  </span>
+                </div>
+                <span style={{
+                  fontSize: '0.65rem',
+                  color: isLight ? '#64748B' : '#94A3B8',
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap'
+                }}>
+                  {destination.capital || destination.country} {destination.weather ? `• ${destination.weather.tempC}°C` : ''}
+                </span>
+              </div>
             </div>
           </Html>
         )}
@@ -294,25 +437,29 @@ const DestinationMarker: React.FC<DestinationMarkerProps> = ({ destination, isFo
 interface CityPinProps {
   city: City;
   isHovered: boolean;
+  theme?: 'light' | 'dark';
   onHover: (name: string | null) => void;
   onClick: () => void;
 }
 
-const CityPin: React.FC<CityPinProps> = ({ city, isHovered, onHover, onClick }) => {
+const CityPin: React.FC<CityPinProps> = ({ city, isHovered, theme = 'dark', onHover, onClick }) => {
   const ringRef = useRef<THREE.Mesh>(null);
-  const pos = useMemo(() => toXYZ(city.lat, city.lng, 2.51), [city.lat, city.lng]);
+  const pos = useMemo(() => toXYZ(city.lat, city.lng, 2.512), [city.lat, city.lng]);
+  const isLight = theme === 'light';
 
   useFrame((state) => {
     if (ringRef.current) {
       const elapsed = state.clock.getElapsedTime();
-      const scale = 1.0 + (elapsed * 2.5) % 2.0;
-      const opacity = 1.0 - (scale - 1.0) / 2.0;
+      const scale = 1.0 + (elapsed * 2.2) % 1.8;
+      const opacity = 1.0 - (scale - 1.0) / 1.8;
       ringRef.current.scale.setScalar(scale);
       if (ringRef.current.material) {
-        (ringRef.current.material as THREE.Material).opacity = opacity;
+        (ringRef.current.material as THREE.Material).opacity = Math.max(0, opacity * 0.6);
       }
     }
   });
+
+  const pinColor = city.type === 'capital' ? '#F59E0B' : (isLight ? '#2563EB' : '#60A5FA');
 
   return (
     <group position={pos}>
@@ -339,15 +486,15 @@ const CityPin: React.FC<CityPinProps> = ({ city, isHovered, onHover, onClick }) 
             onClick();
           }}
         >
-          <sphereGeometry args={[0.024, 16, 16]} />
-          <meshBasicMaterial color={city.type === 'capital' ? '#F59E0B' : '#60A5FA'} />
+          <sphereGeometry args={[0.022, 16, 16]} />
+          <meshBasicMaterial color={pinColor} />
         </mesh>
 
         {/* Pulsing ring */}
         <mesh ref={ringRef}>
-          <ringGeometry args={[0.026, 0.048, 32]} />
+          <ringGeometry args={[0.024, 0.046, 32]} />
           <meshBasicMaterial 
-            color={city.type === 'capital' ? '#F59E0B' : '#60A5FA'} 
+            color={pinColor} 
             transparent={true} 
             depthWrite={false}
           />
@@ -355,20 +502,20 @@ const CityPin: React.FC<CityPinProps> = ({ city, isHovered, onHover, onClick }) 
 
         {/* Label Projected Html overlay */}
         {isHovered && (
-          <Html distanceFactor={4.5} center position={[0, 0.1, 0]}>
+          <Html distanceFactor={4.5} center position={[0, 0.12, 0]}>
             <div style={{
-              background: 'rgba(15, 23, 42, 0.88)',
-              color: '#ffffff',
+              background: isLight ? 'rgba(255, 255, 255, 0.95)' : 'rgba(15, 23, 42, 0.9)',
+              color: isLight ? '#0F172A' : '#FFFFFF',
               padding: '4px 10px',
               borderRadius: '8px',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              fontSize: '0.7rem',
+              border: isLight ? '1px solid rgba(15, 23, 42, 0.12)' : '1px solid rgba(255, 255, 255, 0.15)',
+              fontSize: '0.72rem',
               fontWeight: 700,
               whiteSpace: 'nowrap',
               fontFamily: "'Outfit', sans-serif",
               backdropFilter: 'blur(8px)',
               pointerEvents: 'none',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+              boxShadow: isLight ? '0 4px 14px rgba(0, 0, 0, 0.1)' : '0 4px 14px rgba(0,0,0,0.3)',
               display: 'flex',
               alignItems: 'center',
               gap: '6px'
@@ -377,7 +524,7 @@ const CityPin: React.FC<CityPinProps> = ({ city, isHovered, onHover, onClick }) 
                 width: '6px',
                 height: '6px',
                 borderRadius: '50%',
-                background: city.type === 'capital' ? '#F59E0B' : '#60A5FA'
+                background: pinColor
               }} />
               {city.name}
             </div>
@@ -388,7 +535,160 @@ const CityPin: React.FC<CityPinProps> = ({ city, isHovered, onHover, onClick }) 
   );
 };
 
+export interface HeroFeaturedDestination {
+  id: string;
+  name: string;
+  country: string;
+  flag: string;
+  lat: number;
+  lng: number;
+  image: string;
+}
+
+export const HERO_FEATURED_DESTINATIONS: HeroFeaturedDestination[] = [
+  {
+    id: 'france',
+    name: 'Paris',
+    country: 'France',
+    flag: '🇫🇷',
+    lat: 48.8566,
+    lng: 2.3522,
+    image: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=400&q=80'
+  },
+  {
+    id: 'japan',
+    name: 'Kyoto',
+    country: 'Japan',
+    flag: '🇯🇵',
+    lat: 35.0116,
+    lng: 135.7681,
+    image: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=400&q=80'
+  },
+  {
+    id: 'italy',
+    name: 'Amalfi',
+    country: 'Italy',
+    flag: '🇮🇹',
+    lat: 40.6340,
+    lng: 14.6027,
+    image: 'https://images.unsplash.com/photo-1533105079780-92b9be482077?auto=format&fit=crop&w=400&q=80'
+  },
+  {
+    id: 'uzbekistan',
+    name: 'Samarkand',
+    country: 'Uzbekistan',
+    flag: '🇺🇿',
+    lat: 39.6542,
+    lng: 66.9597,
+    image: 'https://images.unsplash.com/photo-1587974928442-77dc3e0dba72?auto=format&fit=crop&w=400&q=80'
+  }
+];
+
+interface FeaturedDestinationMarkerProps {
+  item: HeroFeaturedDestination;
+  isHovered: boolean;
+  isThemeDark: boolean;
+  onHover: (name: string | null) => void;
+  onClick: (item: HeroFeaturedDestination) => void;
+}
+
+const FeaturedDestinationMarker: React.FC<FeaturedDestinationMarkerProps> = ({
+  item,
+  isHovered,
+  isThemeDark,
+  onHover,
+  onClick
+}) => {
+  const pos = useMemo(() => toXYZ(item.lat, item.lng, 2.518), [item.lat, item.lng]);
+
+  return (
+    <group position={pos}>
+      <group ref={(el) => {
+        if (el) {
+          const target = new THREE.Vector3(...pos).multiplyScalar(2);
+          el.lookAt(target);
+        }
+      }}>
+        {/* Core Pin Needle */}
+        <mesh position={[0, 0, 0.04]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.006, 0.002, 0.08, 12]} />
+          <meshBasicMaterial color="#38BDF8" />
+        </mesh>
+
+        {/* Top Pin Sphere */}
+        <mesh
+          position={[0, 0, 0.08]}
+          onPointerOver={(e) => {
+            e.stopPropagation();
+            onHover(item.name);
+          }}
+          onPointerOut={(e) => {
+            e.stopPropagation();
+            onHover(null);
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick(item);
+          }}
+        >
+          <sphereGeometry args={[0.026, 16, 16]} />
+          <meshStandardMaterial color="#38BDF8" emissive="#38BDF8" emissiveIntensity={0.8} />
+        </mesh>
+
+        {/* Floating Photo Preview Pill on Globe */}
+        <Html distanceFactor={4.8} center position={[0, 0.16, 0]}>
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              onClick(item);
+            }}
+            onMouseEnter={() => onHover(item.name)}
+            onMouseLeave={() => onHover(null)}
+            style={{
+              background: isThemeDark ? 'rgba(11, 15, 23, 0.88)' : 'rgba(255, 255, 255, 0.94)',
+              color: isThemeDark ? '#FFFFFF' : '#111827',
+              padding: '4px 8px 4px 4px',
+              borderRadius: '100px',
+              border: isThemeDark ? '1px solid rgba(56, 189, 248, 0.35)' : '1px solid rgba(37, 99, 235, 0.25)',
+              boxShadow: isThemeDark ? '0 8px 24px rgba(0,0,0,0.6)' : '0 6px 18px rgba(0,0,0,0.08)',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+              pointerEvents: 'auto',
+              userSelect: 'none',
+              transition: 'transform 0.2s ease, border-color 0.2s ease',
+              transform: isHovered ? 'scale(1.08)' : 'scale(1)'
+            }}
+          >
+            <div style={{
+              width: '24px',
+              height: '24px',
+              borderRadius: '50%',
+              overflow: 'hidden',
+              flexShrink: 0
+            }}>
+              <img src={item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1, textAlign: 'left' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                {item.name}
+              </span>
+              <span style={{ fontSize: '0.6rem', color: isThemeDark ? '#94A3B8' : '#6B7280', whiteSpace: 'nowrap' }}>
+                {item.country}
+              </span>
+            </div>
+          </div>
+        </Html>
+      </group>
+    </group>
+  );
+};
+
 interface GlobeSceneProps {
+  theme?: 'light' | 'dark';
   activeSelectedId: string | null;
   activeDestination?: DestinationItem | null;
   previousDestination?: DestinationItem | null;
@@ -407,6 +707,7 @@ interface GlobeSceneProps {
 }
 
 export const GlobeScene: React.FC<GlobeSceneProps> = ({
+  theme = 'dark',
   activeSelectedId,
   activeDestination,
   previousDestination,
@@ -432,6 +733,13 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
   const scaleRef = useRef(0.1);
   const hoverTimeoutRef = useRef<any>(null);
+
+  const isLight = theme === 'light';
+
+  // Contact shadow texture for light mode
+  const shadowTexture = useMemo(() => {
+    return isLight ? createContactShadowTexture() : null;
+  }, [isLight]);
 
   // Smooth camera zoom response to zoomLevel prop
   useEffect(() => {
@@ -506,7 +814,7 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
       gsap.to(groupRef.current.rotation, {
         x: targetX,
         y: targetY,
-        duration: 1.6,
+        duration: 1.5,
         ease: 'power2.out',
       });
     }
@@ -695,7 +1003,7 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
     const deltaY = Math.abs(e.clientY - dragStartRef.current.y);
     dragStartRef.current = null;
 
-    if (deltaX < 5 && deltaY < 5) {
+    if (deltaX < 6 && deltaY < 6) {
       const localPoint = earthRef.current.worldToLocal(e.point.clone());
       const { lat, lng } = xyzToLatLng(localPoint.x, localPoint.y, localPoint.z, 2.5);
 
@@ -749,7 +1057,7 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
   useFrame(() => {
     if (groupRef.current) {
       if (scaleRef.current < 0.999) {
-        scaleRef.current += (1.0 - scaleRef.current) * 0.04;
+        scaleRef.current += (1.0 - scaleRef.current) * 0.05;
         groupRef.current.scale.setScalar(scaleRef.current);
       } else if (scaleRef.current !== 1.0) {
         scaleRef.current = 1.0;
@@ -757,32 +1065,63 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
       }
       
       if (autoRotate) {
-        groupRef.current.rotation.y += 0.0015;
+        groupRef.current.rotation.y += 0.0014;
       }
     }
   });
 
   return (
     <>
-      {/* Natural Sun and Ambient Lighting */}
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[6, 4, 5]} intensity={1.3} color="#FFF8E7" />
-      <pointLight position={[-8, -8, -8]} intensity={0.15} color="#60A5FA" />
+      {/* 1. Realistic Balanced Lighting for Light Mode and Dark Mode */}
+      {isLight ? (
+        <>
+          <ambientLight intensity={0.9} color="#FFFFFF" />
+          <directionalLight position={[7, 5, 6]} intensity={1.65} color="#FFFDF2" />
+          <directionalLight position={[-6, -2, -5]} intensity={0.45} color="#E0F2FE" />
+          <pointLight position={[0, 6, -5]} intensity={0.25} color="#DBEAFE" />
+        </>
+      ) : (
+        <>
+          <ambientLight intensity={0.38} color="#0F172A" />
+          <directionalLight position={[7, 4, 5]} intensity={1.4} color="#FFF8E7" />
+          <directionalLight position={[-8, -5, -6]} intensity={0.18} color="#1E3A8A" />
+          <pointLight position={[-5, 5, -5]} intensity={0.22} color="#60A5FA" />
+        </>
+      )}
 
-      {/* Responsive Orbit Controls with smooth physics damping */}
+      {/* 2. Responsive Orbit Controls with smooth physics damping */}
       <OrbitControls
         enableZoom={true}
         minDistance={3.2}
-        maxDistance={8}
+        maxDistance={7.8}
         enablePan={false}
         enableDamping={true}
-        dampingFactor={0.05}
+        dampingFactor={0.06}
+        rotateSpeed={0.8}
       />
 
-      <Stars radius={100} depth={50} count={5000} factor={3.5} saturation={0} fade speed={1} />
+      {/* 3. Celestial Stars background ONLY rendered in Dark Mode */}
+      {!isLight && (
+        <Stars radius={120} depth={50} count={3500} factor={2.8} saturation={0} fade speed={0.8} />
+      )}
 
+      {/* 4. Soft Ground Contact Shadow disk underneath globe in Light Mode */}
+      {isLight && shadowTexture && (
+        <mesh position={[0, -2.62, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[5.2, 5.2]} />
+          <meshBasicMaterial
+            map={shadowTexture}
+            transparent={true}
+            opacity={0.28}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
+
+      {/* 5. 3D Planetary Globe Group */}
       <group ref={groupRef}>
         <EarthMesh
+          theme={theme}
           earthRef={earthRef}
           onPointerMove={handlePointerMove}
           onPointerOut={handlePointerOut}
@@ -790,36 +1129,67 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
           onPointerUp={handlePointerUp}
         />
 
-        <Clouds />
+        <Clouds theme={theme} />
 
-        <Atmosphere />
+        <Atmosphere theme={theme} />
 
         {/* Global Political Boundaries */}
         {bordersGeometry && (
           <lineSegments geometry={bordersGeometry}>
-            <lineBasicMaterial color="#ffffff" transparent opacity={0.16} toneMapped={false} />
+            <lineBasicMaterial 
+              color={isLight ? "#334155" : "#FFFFFF"} 
+              transparent 
+              opacity={isLight ? 0.14 : 0.18} 
+              toneMapped={false} 
+            />
           </lineSegments>
         )}
 
         {/* Hovered Country Border Highlight */}
         {hoveredBordersGeom && (
           <lineSegments geometry={hoveredBordersGeom}>
-            <lineBasicMaterial color="#60A5FA" transparent opacity={0.5} toneMapped={false} />
+            <lineBasicMaterial 
+              color={isLight ? "#2563EB" : "#60A5FA"} 
+              transparent 
+              opacity={0.7} 
+              toneMapped={false} 
+            />
           </lineSegments>
         )}
 
-        {/* Selected Country Border Highlight */}
+        {/* Selected Country Border Highlight (Amber Gold illuminated outline) */}
         {selectedBordersGeom && (
-          <lineSegments geometry={selectedBordersGeom}>
-            <lineBasicMaterial color="#F59E0B" linewidth={2} transparent opacity={0.9} toneMapped={false} />
-          </lineSegments>
+          <group>
+            <lineSegments geometry={selectedBordersGeom}>
+              <lineBasicMaterial color="#F59E0B" linewidth={2} transparent opacity={0.95} toneMapped={false} />
+            </lineSegments>
+          </group>
         )}
+
+        {/* Prominent Real Photo Destination Markers (Paris, Tokyo, Dubai, Samarkand) */}
+        {HERO_FEATURED_DESTINATIONS.map((dest) => (
+          <FeaturedDestinationMarker
+            key={dest.id}
+            item={dest}
+            isHovered={hoveredCityName === dest.name}
+            onHover={setHoveredCityName}
+            isThemeDark={theme === 'dark'}
+            onClick={(item) => {
+              const resolved = resolveDestination(item.id) || resolveDestination(item.name);
+              if (resolved && onDestinationSelect) {
+                onDestinationSelect(resolved);
+              }
+              if (onSelectCountry) onSelectCountry(item.id);
+            }}
+          />
+        ))}
 
         {/* Major Hub City Pins */}
         {CITIES.map((city, idx) => (
           <CityPin
             key={idx}
             city={city}
+            theme={theme}
             isHovered={hoveredCityName === city.name}
             onHover={setHoveredCityName}
             onClick={() => {
@@ -839,9 +1209,17 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
           />
         ))}
 
-        {/* Focused Accurate Destination Marker Pin */}
+        {/* Focused Accurate Destination Marker Pin with Photo Preview */}
         {activeDestination && (
-          <DestinationMarker destination={activeDestination} isFocused={true} />
+          <DestinationMarker 
+            destination={activeDestination} 
+            isFocused={true} 
+            theme={theme}
+            onClick={() => {
+              if (onDestinationSelect) onDestinationSelect(activeDestination);
+              if (onSelectCountry) onSelectCountry(activeDestination.id);
+            }}
+          />
         )}
 
         {/* Geographically Meaningful 3D Curved Flight Arc with Animated Aircraft */}
@@ -850,7 +1228,7 @@ export const GlobeScene: React.FC<GlobeSceneProps> = ({
             origin={{ lat: previousDestination.lat, lng: previousDestination.lng, name: previousDestination.name }}
             destination={{ lat: activeDestination.lat, lng: activeDestination.lng, name: activeDestination.name }}
             globeRadius={2.52}
-            durationSeconds={2.6}
+            durationSeconds={2.5}
             onArrival={onFlightArrival}
           />
         )}

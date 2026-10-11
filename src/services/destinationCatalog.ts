@@ -773,6 +773,52 @@ export function resolveDestination(query: string, featureProps?: any): Destinati
   );
   if (exactName) return exactName;
 
+  // Special named aliases / city / landmark mappings
+  if (q.includes('dubai') || q.includes('burj khalifa') || q.includes('abu dhabi') || q === 'uae' || q === 'are') {
+    const uae = DESTINATIONS_CATALOG.find(d => d.id === 'uae');
+    if (uae) {
+      if (q.includes('burj')) return { ...uae, lat: 25.1972, lng: 55.2744 };
+      if (q.includes('dubai')) return { ...uae, lat: 25.2048, lng: 55.2708 };
+      return uae;
+    }
+  }
+
+  if (q.includes('eiffel') || q.includes('louvre') || q.includes('paris') || q.includes('riviera') || q.includes('nice') || q === 'fra') {
+    const fra = DESTINATIONS_CATALOG.find(d => d.id === 'france');
+    if (fra) {
+      if (q.includes('eiffel')) return { ...fra, lat: 48.8584, lng: 2.2945 };
+      if (q.includes('riviera') || q.includes('nice')) return { ...fra, lat: 43.7102, lng: 7.2620 };
+      return fra;
+    }
+  }
+
+  if (q.includes('samarkand') || q.includes('registan') || q.includes('shahi zinda') || q.includes('bukhara') || q.includes('khiva') || q.includes('tashkent') || q === 'uzb') {
+    const uzb = DESTINATIONS_CATALOG.find(d => d.id === 'uzbekistan');
+    if (uzb) {
+      if (q.includes('samarkand') || q.includes('registan')) return { ...uzb, lat: 39.6548, lng: 66.9757 };
+      if (q.includes('bukhara')) return { ...uzb, lat: 39.7758, lng: 64.4154 };
+      if (q.includes('khiva')) return { ...uzb, lat: 41.3783, lng: 60.3582 };
+      return uzb;
+    }
+  }
+
+  if (q.includes('tokyo') || q.includes('senso') || q.includes('kyoto') || q.includes('shibuya') || q === 'jpn') {
+    const jpn = DESTINATIONS_CATALOG.find(d => d.id === 'japan');
+    if (jpn) {
+      if (q.includes('kyoto')) return { ...jpn, lat: 35.0116, lng: 135.7681 };
+      return jpn;
+    }
+  }
+
+  if (q.includes('cappadocia') || q.includes('goreme') || q.includes('istanbul') || q.includes('hagia sophia') || q === 'tur') {
+    const tur = DESTINATIONS_CATALOG.find(d => d.id === 'turkey' || d.id === 'cappadocia');
+    if (tur) {
+      if (q.includes('cappadocia')) return DESTINATIONS_CATALOG.find(d => d.id === 'cappadocia') || tur;
+      if (q.includes('istanbul')) return { ...tur, lat: 41.0082, lng: 28.9784 };
+      return tur;
+    }
+  }
+
   // 3. Name or Country starts with query
   const startsWith = DESTINATIONS_CATALOG.find(
     d => d.name.toLowerCase().startsWith(q) || d.country.toLowerCase().startsWith(q)
@@ -821,7 +867,8 @@ export function getDestinationSuggestions(query: string, maxResults = 6): Destin
     if (
       d.name.toLowerCase().includes(q) ||
       d.country.toLowerCase().includes(q) ||
-      d.popularDestinations.some(p => p.name.toLowerCase().includes(q))
+      d.popularDestinations.some(p => p.name.toLowerCase().includes(q)) ||
+      d.places.some(p => p.name.toLowerCase().includes(q))
     ) {
       results.push(d);
       seenIds.add(d.id);
@@ -839,3 +886,4 @@ export function getDestinationSuggestions(query: string, maxResults = 6): Destin
 
   return results;
 }
+

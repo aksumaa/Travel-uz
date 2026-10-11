@@ -1,32 +1,38 @@
+'use client';
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, useInView } from 'framer-motion';
+import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { Globe3D } from '../components/Globe3D';
+import { DestinationStorytelling } from '../components/DestinationStorytelling';
+import { DestinationExplorerSection } from '../components/DestinationExplorerSection';
+import { CountryInfoPanel } from '../components/CountryInfoPanel';
+import { AiPlannerSection } from '../components/AiPlannerSection';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { 
-  Brain, 
-  Sparkles, Star, Users,
-  Compass, Globe, Lock, Languages,
-  MessageSquare, Hotel, Tag
+  Sparkles, Star, Users, Compass, Globe, Lock, Languages, 
+  Hotel, Tag, Calendar, MapPin, Search, ChevronRight, ChevronDown,
+  ArrowRight, Check, Play, X, Shield, DollarSign, Brain, Clock, Plane, Utensils
 } from '../icons';
 
 interface LandingPageProps {
   onStartPlanning: (countryId: string, initialView?: string) => void;
 }
 
-// Custom hook for count-up animations when element is in view
+// Custom hook for animated counter when scrolled into view
 function useAnimatedCounter(target: number, duration: number = 2) {
   const [count, setCount] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
-  const isInView = useInView(ref, { once: true, margin: '-100px' });
+  const isInView = useInView(ref, { once: true, margin: '-60px' });
 
   useEffect(() => {
     if (!isInView) return;
     let start = 0;
     const end = target;
     const totalMs = duration * 1000;
-    const steps = 50;
+    const steps = 45;
     const intervalTime = totalMs / steps;
     const stepIncrement = Math.ceil(end / steps);
 
@@ -46,1026 +52,1456 @@ function useAnimatedCounter(target: number, duration: number = 2) {
   return { count, ref };
 }
 
-const getTranslation = (key: string, lang: string) => {
-  const dict: Record<string, Record<'EN' | 'RU' | 'UZ', string>> = {
-    'Explore World': { EN: 'Explore World', RU: 'Исследовать мир', UZ: 'Dunyoni o‘rganish' },
-    'From City': { EN: 'From City', RU: 'Откуда', UZ: 'Qaysi shahardan' },
-    'To City': { EN: 'To City', RU: 'Куда', UZ: 'Qaysi shaharga' },
-    'Departure Date': { EN: 'Departure Date', RU: 'Дата вылета', UZ: 'Uchish sanasi' },
-    'Return Date': { EN: 'Return Date', RU: 'Дата возвращения', UZ: 'Qaytish sanasi' },
-    'Travelers': { EN: 'Travelers', RU: 'Пассажиры', UZ: 'Yo‘lovchilar' },
-    'Class': { EN: 'Class', RU: 'Класс', UZ: 'Klass' },
-    'Search': { EN: 'Search', RU: 'Поиск', UZ: 'Qidirish' },
-    'City': { EN: 'City', RU: 'Город', UZ: 'Shahar' },
-    'Check-in': { EN: 'Check-in', RU: 'Дата заезда', UZ: 'Kirish sanasi' },
-    'Check-out': { EN: 'Check-out', RU: 'Дата выезда', UZ: 'Chiqish sanasi' },
-    'Guests': { EN: 'Guests', RU: 'Гости', UZ: 'Mehmonlar' },
-    'Rooms': { EN: 'Rooms', RU: 'Номера', UZ: 'Xonalar' },
-    'Cuisine Type': { EN: 'Cuisine Type', RU: 'Тип кухни', UZ: 'Oshxona turi' },
-    'Date': { EN: 'Date', RU: 'Дата', UZ: 'Sana' },
-    'Time': { EN: 'Time', RU: 'Время', UZ: 'Vaqt' },
-    'Find': { EN: 'Find', RU: 'Найти', UZ: 'Topish' },
-    'Economy': { EN: 'Economy', RU: 'Эконом', UZ: 'Ekonom' },
-    'Business': { EN: 'Business', RU: 'Бизнес', UZ: 'Biznes' },
-    'First': { EN: 'First', RU: 'Первый', UZ: 'Birinchi klass' },
-    'AI Itinerary Preview': { EN: 'AI Itinerary Preview', RU: 'Предпросмотр ИИ-Маршрута', UZ: 'AI Marshrut ko‘rinishi' },
-    'Configure your next voyage': { EN: 'Configure your next voyage', RU: 'Настройте вашу следующую поездку', UZ: 'Sayohatni moslashtirish' },
-    'Destination': { EN: 'Destination', RU: 'Направление', UZ: 'Boradigan shahar' },
-    'Start': { EN: 'Start', RU: 'Начало', UZ: 'Boshlanishi' },
-    'End': { EN: 'End', RU: 'Конец', UZ: 'Tugashi' },
-    'Budget': { EN: 'Budget', RU: 'Бюджет', UZ: 'Byudjet' },
-    'Travel Style': { EN: 'Travel Style', RU: 'Стиль поездки', UZ: 'Sayohat uslubi' },
-    'Adventure': { EN: 'Adventure', RU: 'Приключения', UZ: 'Sarguzasht' },
-    'Relaxation': { EN: 'Relaxation', RU: 'Релакс', UZ: 'Hordiq' },
-    'Cultural': { EN: 'Cultural', RU: 'Культура', UZ: 'Madaniy' },
-    'Food': { EN: 'Food', RU: 'Гастрономия', UZ: 'Gastro-sayohat' },
-    'Luxury': { EN: 'Luxury', RU: 'Люкс', UZ: 'Lyuks' },
-    'Generate My Trip': { EN: 'Generate My Trip', RU: 'Создать поездку', UZ: 'Sayohat yaratish' },
-    'Start Free Planning': { EN: 'Start Free Planning', RU: 'Начать бесплатно', UZ: 'Bepul rejalashni boshlash' },
-    'Sign In Now': { EN: 'Sign In Now', RU: 'Войти сейчас', UZ: 'Hisobga kirish' },
-    'Flights': { EN: 'Flights', RU: 'Рейсы', UZ: 'Parvozlar' },
-    'Hotels': { EN: 'Hotels', RU: 'Отели', UZ: 'Mehmonxonalar' },
-    'Restaurants': { EN: 'Restaurants', RU: 'Рестораны', UZ: 'Restoranlar' },
-    'AI Planner': { EN: 'AI Planner', RU: 'ИИ-Планировщик', UZ: 'AI Planner' },
-    'Assistant': { EN: 'Assistant', RU: 'ИИ-Ассистент', UZ: 'AI Assistant' },
-    'Saved': { EN: 'Saved', RU: 'Избранное', UZ: 'Saqlanganlar' },
-  };
-  const upperLang = (lang.toUpperCase() as 'EN' | 'RU' | 'UZ');
-  return dict[key]?.[upperLang] || key;
-};
-
 export const LandingPage: React.FC<LandingPageProps> = ({ onStartPlanning }) => {
   const { t, language } = useLanguage();
   const { setShowAuthModal, user } = useAuth();
+  const { theme } = useTheme();
   const router = useRouter();
-  
-  // Tab switcher in Search Bar
-  const [activeTab, setActiveTab] = useState<'flights' | 'hotels' | 'restaurants'>('flights');
 
-  // Flights Form State
-  const [flightFrom, setFlightFrom] = useState('');
-  const [flightTo, setFlightTo] = useState('');
-  const [flightDepDate, setFlightDepDate] = useState('');
-  const [flightRetDate, setFlightRetDate] = useState('');
-  const [flightTravelers, setFlightTravelers] = useState(1);
-  const [flightClass, setFlightClass] = useState('Economy');
+  // Interactive Video / Walkthrough Demo Modal State
+  const [showDemoModal, setShowDemoModal] = useState(false);
 
-  // Hotels Form State
-  const [hotelCity, setHotelCity] = useState('');
-  const [hotelCheckIn, setHotelCheckIn] = useState('');
-  const [hotelCheckOut, setHotelCheckOut] = useState('');
-  const [hotelGuests, setHotelGuests] = useState(2);
-  const [hotelRooms, setHotelRooms] = useState(1);
+  // Selected Country Info Modal State
+  const [selectedCountryModal, setSelectedCountryModal] = useState<string | null>(null);
 
-  // Restaurants Form State
-  const [restCity, setRestCity] = useState('');
-  const [restCuisine, setRestCuisine] = useState('');
-  const [restDate, setRestDate] = useState('');
-  const [restTime, setRestTime] = useState('');
+  // Active Hero Globe Selected Country
+  const [selectedGlobeCountry, setSelectedGlobeCountry] = useState<string>('uzbekistan');
 
-  // AI Planner Preview Form State
-  const [aiDest, setAiDest] = useState('');
-  const [aiStartDate, setAiStartDate] = useState('');
-  const [aiEndDate, setAiEndDate] = useState('');
-  const [aiBudget, setAiBudget] = useState(1500);
-  const [aiTravelers, setAiTravelers] = useState(2);
-  const [aiStyle, setAiStyle] = useState('Adventure');
-  const [selectedCountry, setSelectedCountry] = useState('uzbekistan');
+  // Product Preview Active Tab
+  const [previewTab, setPreviewTab] = useState<'explore' | 'my-trips' | 'planner' | 'country'>('explore');
 
-  // Helper to handle authenticated clicks
-  const handleAuthGate = (destinationView: string) => {
+  // FAQ Active Accordion
+  const [activeFaq, setActiveFaq] = useState<number | null>(0);
+
+  // Stats Counters
+  const stat1 = useAnimatedCounter(195, 1.6);
+  const stat2 = useAnimatedCounter(10, 1.6); // 10K+
+  const stat3 = useAnimatedCounter(1, 1.6);  // 1M+
+
+  // Navigate / Auth Helper
+  const handleAction = (destinationView: string = 'planner') => {
     localStorage.setItem('auth_redirect_view', destinationView);
     if (user) {
-      onStartPlanning('uzbekistan', destinationView);
       router.push('/dashboard');
     } else {
-      localStorage.setItem('auth_redirect_path', '/dashboard');
       setShowAuthModal(true);
     }
   };
 
-  // Stats Counters
-  const stat1 = useAnimatedCounter(200, 1.5);
-  const stat2 = useAnimatedCounter(10, 1.5); // represents 10K+
-  const stat3 = useAnimatedCounter(1, 1.5);  // represents 1M+
-
-  // Section animation config
-  const sectionAnimation = {
-    initial: { opacity: 0, y: 40 },
-    whileInView: { opacity: 1, y: 0 },
-    viewport: { once: true },
-    transition: { duration: 0.6, ease: 'easeOut' }
-  } as const;
+  const faqItems = [
+    {
+      q: t('faq.items.0.q'),
+      a: t('faq.items.0.a')
+    },
+    {
+      q: t('faq.items.1.q'),
+      a: t('faq.items.1.a')
+    },
+    {
+      q: t('faq.items.2.q'),
+      a: t('faq.items.2.a')
+    },
+    {
+      q: t('faq.items.3.q'),
+      a: t('faq.items.3.a')
+    },
+    {
+      q: t('faq.items.4.q'),
+      a: t('faq.items.4.a')
+    },
+    {
+      q: t('faq.items.5.q'),
+      a: t('faq.items.5.a')
+    },
+    {
+      q: t('faq.items.6.q'),
+      a: t('faq.items.6.a')
+    },
+    {
+      q: t('faq.items.7.q'),
+      a: t('faq.items.7.a')
+    }
+  ];
 
   return (
-    <div style={{ position: 'relative', width: '100%', overflow: 'hidden', background: 'var(--color-bg)' }}>
+    <div style={{ position: 'relative', width: '100%', overflowX: 'hidden', background: 'var(--color-bg)' }}>
       
-      {/* SECTION 1 — HERO */}
-      <motion.section 
-        {...sectionAnimation}
+      {/* ======================================================== */}
+      {/* SECTION 2 — HERO */}
+      {/* ======================================================== */}
+      <section 
         style={{
           position: 'relative',
           minHeight: '100vh',
-          background: 'var(--color-bg)',
           display: 'flex',
           flexDirection: 'column',
+          alignItems: 'center',
           justifyContent: 'center',
-          alignItems: 'center',
-          padding: '80px 24px',
-          overflow: 'hidden',
-          zIndex: 10
-        }}
-      >
-        {/* Hero Top Title & Value Proposition */}
-        <div style={{
-          position: 'relative',
-          zIndex: 10,
-          textAlign: 'center',
-          maxWidth: '850px',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '16px',
-          marginBottom: '28px'
-        }}>
-          {/* Badge */}
-          <span style={{
-            background: 'rgba(37, 99, 235, 0.12)',
-            color: '#60A5FA',
-            padding: '6px 18px',
-            borderRadius: '100px',
-            fontSize: '0.78rem',
-            fontWeight: 800,
-            letterSpacing: '1px',
-            textTransform: 'uppercase',
-            border: '1px solid rgba(37, 99, 235, 0.3)',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}>
-            <Sparkles size={14} /> Global AI Travel Platform
-          </span>
-
-          {/* Headline */}
-          <h1 className="text-gradient" style={{
-            fontFamily: 'var(--font-heading)',
-            fontSize: 'clamp(2.4rem, 5vw, 3.8rem)',
-            fontWeight: 900,
-            lineHeight: 1.15,
-            letterSpacing: '-1.5px',
-            margin: 0
-          }}>
-            {t('hero.headline')}
-          </h1>
-
-          {/* Subtitle */}
-          <p style={{
-            color: 'var(--color-text-secondary)',
-            fontSize: 'clamp(0.95rem, 2vw, 1.15rem)',
-            lineHeight: 1.6,
-            maxWidth: '640px',
-            margin: 0
-          }}>
-            Explore global destinations on the interactive 3D Earth. Search cities, follow realistic flight paths, and craft tailored itineraries with AI intelligence.
-          </p>
-        </div>
-
-        {/* INTERACTIVE 3D EARTH GLOBE ARENA */}
-        <div style={{
-          position: 'relative',
-          zIndex: 5,
-          width: '100%',
-          maxWidth: '1240px',
-          height: '620px',
-          borderRadius: '28px',
-          border: '1px solid var(--glass-border)',
-          background: 'radial-gradient(circle at 50% 50%, rgba(13, 21, 39, 0.7) 0%, rgba(6, 9, 20, 0.95) 100%)',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.45)',
+          padding: '120px 24px 60px 24px',
+          background: theme === 'light'
+            ? 'radial-gradient(ellipse at 50% 30%, rgba(219, 234, 254, 0.45) 0%, rgba(241, 245, 249, 0.9) 70%, var(--color-bg) 100%)'
+            : 'radial-gradient(ellipse at 50% 20%, rgba(37, 99, 235, 0.12) 0%, rgba(6, 9, 20, 0.95) 70%, var(--color-bg) 100%)',
           overflow: 'hidden'
-        }}>
-          <Globe3D 
-            selectedCountry={selectedCountry}
-            showSearchBar={true}
-            onSelectCountry={(id) => {
-              setSelectedCountry(id);
-            }}
-            onCreateTrip={(dest) => {
-              handleAuthGate('planner');
-            }}
-          />
-        </div>
-      </motion.section>
-
-      {/* SECTION 2 — SEARCH BAR */}
-      <motion.section 
-        {...sectionAnimation}
-        style={{
-          position: 'relative',
-          zIndex: 20,
-          padding: '0 24px 60px 24px',
-          marginTop: '-60px'
         }}
       >
-        <div 
-          className="glass-panel" 
+        {/* Subtle Background Glow Lines */}
+        <div style={{
+          position: 'absolute',
+          top: '10%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 'min(1200px, 95vw)',
+          height: '400px',
+          background: 'radial-gradient(circle, rgba(37, 99, 235, 0.18) 0%, transparent 70%)',
+          filter: 'blur(60px)',
+          pointerEvents: 'none',
+          zIndex: 1
+        }} />
+
+        {/* Hero Top Content */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: 'easeOut' }}
           style={{
-            maxWidth: '900px',
-            margin: '0 auto',
-            padding: '24px 32px',
-            boxShadow: 'var(--glass-shadow)',
-            background: 'var(--color-bg-surface)'
+            position: 'relative',
+            zIndex: 10,
+            textAlign: 'center',
+            maxWidth: '860px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '18px',
+            marginBottom: '36px'
           }}
         >
-          {/* Tabs */}
-          <div style={{ display: 'flex', gap: '20px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '12px', marginBottom: '24px' }}>
+          {/* Top Pill Badge */}
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '6px 18px',
+            borderRadius: '100px',
+            background: 'var(--accent-subtle, rgba(37, 99, 235, 0.1))',
+            border: '1px solid var(--accent-subtle, rgba(37, 99, 235, 0.25))',
+            color: 'var(--accent, #2563EB)',
+            fontSize: '0.8rem',
+            fontWeight: 800,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            fontFamily: "var(--font-sans, 'Inter', sans-serif)"
+          }}>
+            <Sparkles size={14} />
+            <span>{t('hero.badge')}</span>
+          </div>
+
+          {/* Main Headline */}
+          <h1 style={{
+            fontFamily: "var(--font-display, 'DM Serif Display', 'Playfair Display', serif)",
+            fontSize: 'clamp(3rem, 6.8vw, 5.2rem)',
+            fontWeight: 400,
+            lineHeight: 1.05,
+            letterSpacing: '-0.02em',
+            margin: 0,
+            color: 'var(--color-text-primary)'
+          }}>
+            {t('hero.titleLine1')}<br />
+            <span style={{
+              fontStyle: 'italic',
+              background: 'linear-gradient(135deg, var(--accent, #2563EB) 0%, #7C3AED 50%, #EC4899 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              display: 'inline-block'
+            }}>
+              {t('hero.titleLine2')}
+            </span>
+          </h1>
+
+          {/* Supporting Text */}
+          <p style={{
+            fontFamily: "var(--font-sans, 'Inter', sans-serif)",
+            fontSize: 'clamp(1.05rem, 2vw, 1.25rem)',
+            color: 'var(--color-text-secondary)',
+            fontWeight: 400,
+            lineHeight: 1.6,
+            maxWidth: '580px',
+            margin: '6px 0 0 0'
+          }}>
+            {t('hero.subtitle')}
+          </p>
+
+          {/* CTAs */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '14px',
+            flexWrap: 'wrap',
+            marginTop: '12px'
+          }}>
+            {/* Primary CTA */}
+            <motion.button
+              whileHover={{ scale: 1.04, y: -2 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                const el = document.getElementById('destinations');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              style={{
+                padding: '15px 34px',
+                borderRadius: '14px',
+                background: 'linear-gradient(135deg, #2563EB, #7C3AED)',
+                color: '#ffffff',
+                border: 'none',
+                fontSize: '1rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                boxShadow: '0 8px 25px rgba(37, 99, 235, 0.4)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontFamily: "'Outfit', sans-serif"
+              }}
+            >
+              <span>{t('hero.startExploring')}</span>
+              <ArrowRight size={18} />
+            </motion.button>
+
+            {/* Secondary CTA */}
+            <motion.button
+              whileHover={{ scale: 1.04, y: -2 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setShowDemoModal(true)}
+              style={{
+                padding: '14px 28px',
+                borderRadius: '14px',
+                background: 'var(--glass-bg)',
+                color: 'var(--color-text-primary)',
+                border: '1px solid var(--glass-border)',
+                fontSize: '0.98rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                backdropFilter: 'blur(12px)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '10px',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.06)'
+              }}
+            >
+              <div style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                background: 'rgba(37, 99, 235, 0.15)',
+                color: '#2563EB',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Play size={13} style={{ marginLeft: '2px' }} />
+              </div>
+              <span>{t('hero.watchDemo')}</span>
+            </motion.button>
+          </div>
+        </motion.div>
+
+        {/* HERO VISUAL — Highly Realistic Interactive 3D Earth Globe Arena */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 1.0, delay: 0.2 }}
+          style={{
+            position: 'relative',
+            zIndex: 5,
+            width: '100%',
+            maxWidth: '1240px',
+            height: 'min(640px, 75vh)',
+            borderRadius: '32px',
+            border: theme === 'light' ? '1px solid rgba(148, 163, 184, 0.3)' : '1px solid rgba(255, 255, 255, 0.1)',
+            background: theme === 'light'
+              ? 'radial-gradient(circle at 50% 45%, rgba(239, 246, 255, 0.7) 0%, rgba(219, 234, 254, 0.5) 60%, rgba(248, 250, 252, 0.9) 100%)'
+              : 'radial-gradient(circle at 50% 45%, rgba(15, 23, 42, 0.9) 0%, rgba(6, 9, 20, 0.98) 100%)',
+            boxShadow: theme === 'light'
+              ? '0 25px 60px rgba(37, 99, 235, 0.12), 0 2px 10px rgba(0,0,0,0.04)'
+              : '0 30px 80px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.1)',
+            overflow: 'hidden'
+          }}
+        >
+          {/* Active Featured Destination Bar (Top-left inside Hero Globe) */}
+          <div style={{
+            position: 'absolute',
+            top: '20px',
+            left: '20px',
+            zIndex: 30,
+            display: 'flex',
+            gap: '8px',
+            flexWrap: 'wrap',
+            maxWidth: '85%'
+          }}>
+            <div style={{
+              background: 'var(--color-bg-surface, rgba(255, 255, 255, 0.9))',
+              backdropFilter: 'blur(16px)',
+              padding: '6px 14px',
+              borderRadius: '50px',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              color: 'var(--color-text-secondary)',
+              border: '1px solid var(--glass-border)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+            }}>
+              <MapPin size={13} style={{ color: '#2563EB' }} />
+              <span>{t('hero.interactiveHubs')}</span>
+            </div>
             {[
-              { id: 'flights', label: '✈️ ' + getTranslation('Flights', language) },
-              { id: 'hotels', label: '🏨 ' + getTranslation('Hotels', language) },
-              { id: 'restaurants', label: '🍽️ ' + getTranslation('Restaurants', language) }
-            ].map(tab => (
+              { name: 'Paris', flag: '🇫🇷', id: 'paris' },
+              { name: 'Tokyo', flag: '🇯🇵', id: 'tokyo' },
+              { name: 'Dubai', flag: '🇦🇪', id: 'dubai' },
+              { name: 'Samarkand', flag: '🇺🇿', id: 'samarkand' },
+              { name: 'New York', flag: '🇺🇸', id: 'usa' }
+            ].map(city => (
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                key={city.id}
+                onClick={() => {
+                  setSelectedGlobeCountry(city.id);
+                  const searchInput = document.querySelector('input[placeholder*="Search"]') as HTMLInputElement;
+                  if (searchInput) {
+                    searchInput.value = city.name;
+                    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                  }
+                }}
                 style={{
-                  fontSize: '0.95rem',
+                  background: selectedGlobeCountry === city.id ? 'var(--accent, #2563EB)' : 'var(--glass-bg)',
+                  backdropFilter: 'blur(14px)',
+                  padding: '5px 12px',
+                  borderRadius: '50px',
+                  fontSize: '0.75rem',
                   fontWeight: 700,
-                  color: activeTab === tab.id ? 'var(--color-accent)' : 'var(--color-text-muted)',
-                  borderBottom: activeTab === tab.id ? '2px solid var(--color-accent)' : 'none',
-                  paddingBottom: '12px',
-                  marginBottom: '-14px',
-                  transition: 'all 0.2s'
+                  color: selectedGlobeCountry === city.id ? '#ffffff' : 'var(--color-text-primary)',
+                  border: '1px solid var(--glass-border)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  transition: 'all 0.2s ease',
+                  boxShadow: selectedGlobeCountry === city.id ? '0 4px 14px rgba(37, 99, 235, 0.4)' : 'none'
                 }}
               >
-                {tab.label}
+                <span>{city.flag}</span>
+                <span>{city.name}</span>
               </button>
             ))}
           </div>
 
-          {/* Tab Contents */}
-          <div style={{ textAlign: 'left' }}>
-            {activeTab === 'flights' && (
-              <form 
-                onSubmit={(e) => { e.preventDefault(); handleAuthGate('flights'); }}
-                style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '14px', alignItems: 'end' }}
-              >
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>{getTranslation('From City', language)}</label>
-                  <input type="text" required placeholder="Tashkent" value={flightFrom} onChange={(e) => setFlightFrom(e.target.value)} style={{ padding: '12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '10px', color: 'var(--color-text-primary)', width: '100%' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>{getTranslation('To City', language)}</label>
-                  <input type="text" required placeholder="Paris" value={flightTo} onChange={(e) => setFlightTo(e.target.value)} style={{ padding: '12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '10px', color: 'var(--color-text-primary)', width: '100%' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>{getTranslation('Departure Date', language)}</label>
-                  <input type="date" required value={flightDepDate} onChange={(e) => setFlightDepDate(e.target.value)} style={{ padding: '10px 12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '10px', color: 'var(--color-text-primary)', width: '100%' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>{getTranslation('Return Date', language)}</label>
-                  <input type="date" required value={flightRetDate} onChange={(e) => setFlightRetDate(e.target.value)} style={{ padding: '10px 12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '10px', color: 'var(--color-text-primary)', width: '100%' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>{getTranslation('Travelers', language)}</label>
-                  <input type="number" min={1} max={10} value={flightTravelers} onChange={(e) => setFlightTravelers(parseInt(e.target.value))} style={{ padding: '12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '10px', color: 'var(--color-text-primary)', width: '100%' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>{getTranslation('Class', language)}</label>
-                  <select value={flightClass} onChange={(e) => setFlightClass(e.target.value)} style={{ padding: '12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '10px', color: 'var(--color-text-primary)', width: '100%' }}>
-                    <option value="Economy">{getTranslation('Economy', language)}</option>
-                    <option value="Business">{getTranslation('Business', language)}</option>
-                    <option value="First">{getTranslation('First', language)}</option>
-                  </select>
-                </div>
-                <button type="submit" className="btn-premium" style={{ height: '45px', border: 'none', width: '100%' }}>
-                  {getTranslation('Search', language)}
-                </button>
-              </form>
-            )}
+          <Globe3D 
+            selectedCountry={selectedGlobeCountry}
+            showSearchBar={true}
+            onDestinationSelect={(dest) => {
+              setSelectedGlobeCountry(dest.id);
+            }}
+          />
+        </motion.div>
+      </section>
 
-            {activeTab === 'hotels' && (
-              <form 
-                onSubmit={(e) => { e.preventDefault(); handleAuthGate('hotels'); }}
-                style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '14px', alignItems: 'end' }}
-              >
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>{getTranslation('City', language)}</label>
-                  <input type="text" required placeholder="Dubai" value={hotelCity} onChange={(e) => setHotelCity(e.target.value)} style={{ padding: '12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '10px', color: 'var(--color-text-primary)', width: '100%' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>{getTranslation('Check-in', language)}</label>
-                  <input type="date" required value={hotelCheckIn} onChange={(e) => setHotelCheckIn(e.target.value)} style={{ padding: '10px 12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '10px', color: 'var(--color-text-primary)', width: '100%' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>{getTranslation('Check-out', language)}</label>
-                  <input type="date" required value={hotelCheckOut} onChange={(e) => setHotelCheckOut(e.target.value)} style={{ padding: '10px 12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '10px', color: 'var(--color-text-primary)', width: '100%' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>{getTranslation('Guests', language)}</label>
-                  <input type="number" min={1} value={hotelGuests} onChange={(e) => setHotelGuests(parseInt(e.target.value))} style={{ padding: '12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '10px', color: 'var(--color-text-primary)', width: '100%' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>{getTranslation('Rooms', language)}</label>
-                  <input type="number" min={1} value={hotelRooms} onChange={(e) => setHotelRooms(parseInt(e.target.value))} style={{ padding: '12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '10px', color: 'var(--color-text-primary)', width: '100%' }} />
-                </div>
-                <button type="submit" className="btn-premium" style={{ height: '45px', border: 'none', width: '100%' }}>
-                  {getTranslation('Search', language)}
-                </button>
-              </form>
-            )}
-
-            {activeTab === 'restaurants' && (
-              <form 
-                onSubmit={(e) => { e.preventDefault(); handleAuthGate('attractions'); }}
-                style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '14px', alignItems: 'end' }}
-              >
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>{getTranslation('City', language)}</label>
-                  <input type="text" required placeholder="Tokyo" value={restCity} onChange={(e) => setRestCity(e.target.value)} style={{ padding: '12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '10px', color: 'var(--color-text-primary)', width: '100%' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>{getTranslation('Cuisine Type', language)}</label>
-                  <input type="text" placeholder="Sushi, Italian, local" value={restCuisine} onChange={(e) => setRestCuisine(e.target.value)} style={{ padding: '12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '10px', color: 'var(--color-text-primary)', width: '100%' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>{getTranslation('Date', language)}</label>
-                  <input type="date" required value={restDate} onChange={(e) => setRestDate(e.target.value)} style={{ padding: '10px 12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '10px', color: 'var(--color-text-primary)', width: '100%' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>{getTranslation('Time', language)}</label>
-                  <input type="time" required value={restTime} onChange={(e) => setRestTime(e.target.value)} style={{ padding: '10px 12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '10px', color: 'var(--color-text-primary)', width: '100%' }} />
-                </div>
-                <button type="submit" className="btn-premium" style={{ height: '45px', border: 'none', width: '100%' }}>
-                  {getTranslation('Find', language)}
-                </button>
-              </form>
-            )}
-          </div>
-        </div>
-      </motion.section>
-
-      {/* SECTION 3 — CATEGORY PILLS */}
-      <motion.section 
-        {...sectionAnimation}
-        style={{ padding: '20px 24px', display: 'flex', justifyContent: 'center' }}
-      >
-        <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', padding: '10px 0', maxWidth: '100%', scrollbarWidth: 'none' }}>
-          {[
-            { label: '✈️ ' + getTranslation('Flights', language), view: 'flights' },
-            { label: '🏨 ' + getTranslation('Hotels', language), view: 'hotels' },
-            { label: '🍽️ ' + getTranslation('Restaurants', language), view: 'attractions' },
-            { label: '🤖 ' + getTranslation('AI Planner', language), view: 'planner' },
-            { label: '💬 ' + getTranslation('Assistant', language), view: 'assistant' },
-            { label: '❤️ ' + getTranslation('Saved', language), view: 'saved' }
-          ].map((pill, idx) => (
-            <motion.button
-              key={idx}
-              whileHover={{ scale: 1.05, borderColor: 'var(--color-accent)' }}
-              onClick={() => handleAuthGate(pill.view)}
-              className="glass-panel"
-              style={{
-                padding: '10px 20px',
-                borderRadius: '50px',
-                background: 'var(--glass-bg)',
-                whiteSpace: 'nowrap',
-                fontWeight: 700,
-                fontSize: '0.85rem',
-                color: 'var(--color-text-primary)',
-                border: '1px solid var(--glass-border)'
-              }}
-            >
-              {pill.label}
-            </motion.button>
-          ))}
-        </div>
-      </motion.section>
-
-      {/* SECTION 4 — STATS BANNER */}
-      <motion.section 
-        {...sectionAnimation}
-        style={{ padding: '60px 24px' }}
-      >
+      {/* ======================================================== */}
+      {/* SECTION 3 — STATS */}
+      {/* ======================================================== */}
+      <section style={{ padding: '40px 24px 70px 24px', position: 'relative', zIndex: 10 }}>
         <div 
-          className="glass-panel"
           style={{
-            maxWidth: '1200px',
+            maxWidth: '1100px',
             margin: '0 auto',
-            background: 'linear-gradient(135deg, #091026 0%, #050815 100%)',
-            color: '#ffffff',
-            padding: '40px 32px',
+            borderRadius: '28px',
+            background: 'var(--color-bg-surface)',
+            border: '1px solid var(--glass-border)',
+            boxShadow: 'var(--glass-shadow)',
+            padding: '48px 32px',
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: '24px',
-            textAlign: 'center',
-            border: '1px solid rgba(255,255,255,0.08)'
+            gap: '32px',
+            textAlign: 'center'
           }}
         >
-          {/* Col 1 */}
-          <div ref={stat1.ref} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <span style={{ fontSize: '2.5rem', fontWeight: 900, fontFamily: 'var(--font-heading)', color: 'var(--color-accent)' }}>
+          {/* Stat 1 */}
+          <div ref={stat1.ref} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <span style={{
+              fontFamily: "'Outfit', sans-serif",
+              fontSize: 'clamp(2.6rem, 4vw, 3.4rem)',
+              fontWeight: 900,
+              color: '#2563EB',
+              lineHeight: 1
+            }}>
               {stat1.count}+
             </span>
-            <span style={{ fontSize: '0.9rem', color: '#94a3b8', fontWeight: 600 }}>{t('stats.countries')}</span>
+            <span style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-text-primary)' }}>
+              {t('stats.countries')}
+            </span>
+            <span style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', fontWeight: 500 }}>
+              {t('stats.countriesDesc')}
+            </span>
           </div>
 
-          {/* Col 2 */}
-          <div ref={stat2.ref} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <span style={{ fontSize: '2.5rem', fontWeight: 900, fontFamily: 'var(--font-heading)', color: 'var(--color-purple)' }}>
+          {/* Stat 2 */}
+          <div ref={stat2.ref} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <span style={{
+              fontFamily: "'Outfit', sans-serif",
+              fontSize: 'clamp(2.6rem, 4vw, 3.4rem)',
+              fontWeight: 900,
+              color: '#7C3AED',
+              lineHeight: 1
+            }}>
               {stat2.count}K+
             </span>
-            <span style={{ fontSize: '0.9rem', color: '#94a3b8', fontWeight: 600 }}>{t('stats.destinations')}</span>
+            <span style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-text-primary)' }}>
+              {t('stats.destinations')}
+            </span>
+            <span style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', fontWeight: 500 }}>
+              {t('stats.destinationsDesc')}
+            </span>
           </div>
 
-          {/* Col 3 */}
-          <div ref={stat3.ref} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <span style={{ fontSize: '2.5rem', fontWeight: 900, fontFamily: 'var(--font-heading)', color: '#10b981' }}>
+          {/* Stat 3 */}
+          <div ref={stat3.ref} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <span style={{
+              fontFamily: "'Outfit', sans-serif",
+              fontSize: 'clamp(2.6rem, 4vw, 3.4rem)',
+              fontWeight: 900,
+              color: '#EC4899',
+              lineHeight: 1
+            }}>
               {stat3.count}M+
             </span>
-            <span style={{ fontSize: '0.9rem', color: '#94a3b8', fontWeight: 600 }}>{t('stats.travelers')}</span>
-          </div>
-
-          {/* Col 4 */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <span style={{ fontSize: '2.5rem', fontWeight: 900, fontFamily: 'var(--font-heading)', color: '#f59e0b' }}>
-              24/7
+            <span style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-text-primary)' }}>
+              {t('stats.travelers')}
             </span>
-            <span style={{ fontSize: '0.9rem', color: '#94a3b8', fontWeight: 600 }}>{t('stats.support')}</span>
+            <span style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', fontWeight: 500 }}>
+              {t('stats.travelersDesc')}
+            </span>
           </div>
         </div>
-      </motion.section>
+      </section>
 
-      {/* SECTION 5 — POPULAR DESTINATIONS */}
-      <motion.section 
-        {...sectionAnimation}
-        id="destinations"
-        style={{ padding: '60px 24px', maxWidth: '1200px', margin: '0 auto' }}
+      {/* ======================================================== */}
+      {/* SECTION 4 — HOW IT WORKS */}
+      {/* ======================================================== */}
+      <section 
+        id="how-it-works"
+        style={{
+          padding: '80px 24px',
+          maxWidth: '1240px',
+          margin: '0 auto',
+          position: 'relative'
+        }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <h2 className="section-title text-gradient" style={{ margin: 0, fontSize: '2.2rem', textAlign: 'left' }}>
-            {t('destinations.title')}
+        <div style={{ textAlign: 'center', marginBottom: '56px' }}>
+          <span style={{
+            color: 'var(--accent, #2563EB)',
+            fontWeight: 800,
+            textTransform: 'uppercase',
+            fontSize: '0.8rem',
+            letterSpacing: '0.14em',
+            display: 'inline-block',
+            marginBottom: '10px',
+            fontFamily: "var(--font-sans, 'Inter', sans-serif)"
+          }}>
+            {t('howItWorks.badge')}
+          </span>
+          <h2 style={{
+            fontFamily: "var(--font-display, 'DM Serif Display', 'Playfair Display', serif)",
+            fontSize: 'clamp(2.4rem, 4.5vw, 3.5rem)',
+            fontWeight: 400,
+            color: 'var(--color-text-primary)',
+            margin: '0 0 14px 0'
+          }}>
+            {t('howItWorks.title')}
           </h2>
-          <a href="#explore" onClick={(e) => { e.preventDefault(); handleAuthGate('home'); }} style={{ color: 'var(--color-accent)', fontWeight: 700, fontSize: '0.9rem', textDecoration: 'none' }}>
-            {t('destinations.seeAll')}
-          </a>
+          <p style={{
+            fontFamily: "var(--font-sans, 'Inter', sans-serif)",
+            color: 'var(--color-text-secondary)',
+            fontSize: '1.05rem',
+            lineHeight: 1.6,
+            maxWidth: '560px',
+            margin: '0 auto'
+          }}>
+            {t('howItWorks.subtitle')}
+          </p>
         </div>
 
-        {/* Horizontal Scroll list */}
-        <div style={{ display: 'flex', gap: '20px', overflowX: 'auto', paddingBottom: '16px', scrollbarWidth: 'none' }}>
-          {[
-            { city: 'Istanbul', country: 'Turkey', keyword: 'turkey,istanbul', flag: '🇹🇷', rating: '4.8', price: '$750', image: 'https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?auto=format&fit=crop&w=600&q=80' },
-            { city: 'Dubai', country: 'UAE', keyword: 'dubai,emirates', flag: '🇦🇪', rating: '4.8', price: '$850', image: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=600&q=80' },
-            { city: 'Paris', country: 'France', keyword: 'paris,france', flag: '🇫🇷', rating: '4.7', price: '$900', image: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=600&q=80' },
-            { city: 'Phuket', country: 'Thailand', keyword: 'thailand,phuket', flag: '🇹🇭', rating: '4.7', price: '$650', image: 'https://images.unsplash.com/photo-1589308078059-be1415eab4c3?auto=format&fit=crop&w=600&q=80' },
-            { city: 'Maldives', country: 'Maldives', keyword: 'maldives,beach', flag: '🇲🇻', rating: '4.9', price: '$1200', image: 'https://images.unsplash.com/photo-1514282401047-d79a71a590e8?auto=format&fit=crop&w=600&q=80' },
-            { city: 'Samarkand', country: 'Uzbekistan', keyword: 'samarkand,registan', flag: '🇺🇿', rating: '4.9', price: '$450', image: 'https://images.unsplash.com/photo-1587974928442-77dc3e0dba72?auto=format&fit=crop&w=600&q=80' }
-          ].map((dest, idx) => (
-            <motion.div
-              key={idx}
-              whileHover={{ scale: 1.03, y: -4 }}
-              className="glass-panel"
-              style={{
-                flex: '0 0 280px',
-                overflow: 'hidden',
-                borderRadius: '24px',
-                background: 'var(--color-bg-surface)',
-                border: '1px solid var(--glass-border)',
-                boxShadow: 'var(--glass-shadow)',
-                cursor: 'pointer'
-              }}
-              onClick={() => handleAuthGate('planner')}
-            >
-              <div style={{ position: 'relative', height: '200px', overflow: 'hidden' }}>
-                <img 
-                  src={dest.image}
-                  alt={dest.city}
-                  loading="lazy"
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-                <div style={{
-                  position: 'absolute',
-                  inset: 0,
-                  background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 50%)'
-                }} />
-                
-                {/* Rating */}
-                <div style={{
-                  position: 'absolute',
-                  top: '12px',
-                  right: '12px',
-                  background: 'rgba(255, 255, 255, 0.9)',
-                  padding: '4px 10px',
-                  borderRadius: '100px',
-                  fontSize: '0.75rem',
-                  fontWeight: 800,
-                  color: '#d97706',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
-                  <Star size={12} fill="#d97706" stroke="none" /> {dest.rating}
-                </div>
-
-                {/* Price badge */}
-                <div style={{
-                  position: 'absolute',
-                  bottom: '12px',
-                  right: '12px',
-                  background: 'linear-gradient(135deg, var(--color-accent), var(--color-purple))',
-                  padding: '4px 12px',
-                  borderRadius: '50px',
-                  fontSize: '0.75rem',
-                  fontWeight: 800,
-                  color: '#ffffff'
-                }}>
-                  From {dest.price}
-                </div>
-              </div>
-
-              {/* Card Footer Details */}
-              <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px', textAlign: 'left' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-accent)', fontWeight: 800, textTransform: 'uppercase' }}>
-                  {dest.flag} {dest.country}
-                </span>
-                <h4 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--color-text-primary)', margin: 0 }}>
-                  {dest.city}
-                </h4>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </motion.section>
-
-      {/* SECTION 6 — AI PLANNER PREVIEW */}
-      <motion.section 
-        {...sectionAnimation}
-        style={{ padding: '60px 24px', maxWidth: '1200px', margin: '0 auto' }}
-      >
+        {/* 3 Simple Steps Grid with Real Product UI Examples */}
         <div style={{
-          background: 'var(--color-bg-surface)',
-          border: '1px solid var(--glass-border)',
-          borderRadius: '32px',
-          padding: '40px',
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-          gap: '40px',
-          alignItems: 'center',
-          boxShadow: 'var(--glass-shadow)'
+          gap: '28px'
         }}>
-          {/* Left: configuration form */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'left' }}>
-            <span style={{ color: 'var(--color-purple)', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Brain size={16} /> {getTranslation('AI Itinerary Preview', language)}
-            </span>
-            <h3 style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--color-text-primary)', margin: 0, fontFamily: 'var(--font-heading)' }}>
-              {getTranslation('Configure your next voyage', language)}
-            </h3>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '4px' }}>{getTranslation('Destination', language)}</label>
-                <input type="text" placeholder="Samarkand, Uzbekistan" value={aiDest} onChange={(e) => setAiDest(e.target.value)} style={{ width: '100%', padding: '10px 14px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '10px', fontSize: '0.85rem' }} />
-              </div>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '4px' }}>{getTranslation('Start', language)}</label>
-                  <input type="date" value={aiStartDate} onChange={(e) => setAiStartDate(e.target.value)} style={{ width: '100%', padding: '8px 12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '10px', fontSize: '0.85rem' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '4px' }}>{getTranslation('End', language)}</label>
-                  <input type="date" value={aiEndDate} onChange={(e) => setAiEndDate(e.target.value)} style={{ width: '100%', padding: '8px 12px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '10px', fontSize: '0.85rem' }} />
-                </div>
-              </div>
-
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
-                  <span>{getTranslation('Budget', language)}</span>
-                  <span>${aiBudget}</span>
-                </div>
-                <input type="range" min={500} max={10000} step={250} value={aiBudget} onChange={(e) => setAiBudget(parseInt(e.target.value))} style={{ width: '100%', height: '6px', borderRadius: '4px', background: 'var(--glass-border)' }} />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '12px', alignItems: 'end' }}>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '4px' }}>{getTranslation('Travelers', language)}</label>
-                  <input type="number" min={1} max={10} value={aiTravelers} onChange={(e) => setAiTravelers(parseInt(e.target.value))} style={{ width: '100%', padding: '10px 14px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '10px', fontSize: '0.85rem' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '4px' }}>{getTranslation('Travel Style', language)}</label>
-                  <select value={aiStyle} onChange={(e) => setAiStyle(e.target.value)} style={{ width: '100%', padding: '10px 14px', background: 'var(--color-bg)', border: '1px solid var(--glass-border)', borderRadius: '10px', fontSize: '0.85rem' }}>
-                    <option value="Adventure">{getTranslation('Adventure', language)}</option>
-                    <option value="Relaxation">{getTranslation('Relaxation', language)}</option>
-                    <option value="Cultural">{getTranslation('Cultural', language)}</option>
-                    <option value="Food">{getTranslation('Food', language)}</option>
-                    <option value="Luxury">{getTranslation('Luxury', language)}</option>
-                  </select>
-                </div>
-              </div>
+          {/* Step 1 */}
+          <motion.div
+            whileHover={{ y: -6 }}
+            style={{
+              background: 'var(--color-bg-surface)',
+              border: '1px solid var(--glass-border)',
+              borderRadius: '24px',
+              padding: '36px 28px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px',
+              boxShadow: 'var(--glass-shadow)',
+              position: 'relative',
+              overflow: 'hidden'
+            }}
+          >
+            <div style={{
+              width: '54px',
+              height: '54px',
+              borderRadius: '16px',
+              background: 'var(--accent-subtle, rgba(37, 99, 235, 0.12))',
+              color: 'var(--accent, #2563EB)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1.3rem',
+              fontWeight: 900,
+              fontFamily: "var(--font-sans, 'Inter', sans-serif)"
+            }}>
+              01
             </div>
 
-            <button 
-              onClick={() => handleAuthGate('planner')}
-              className="btn-premium"
-              style={{ border: 'none', background: 'linear-gradient(135deg, var(--color-purple), var(--color-accent))', width: '100%', marginTop: '8px' }}
-            >
-              <Sparkles size={16} /> {getTranslation('Generate My Trip', language)}
-            </button>
-          </div>
-
-          {/* Right: SVG mapping visualizer */}
-          <div style={{
-            background: 'var(--color-bg)',
-            borderRadius: '24px',
-            border: '1px solid var(--glass-border)',
-            height: '350px',
-            position: 'relative',
-            overflow: 'hidden',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            {/* Grid lines background */}
-            <div style={{
-              position: 'absolute',
-              inset: 0,
-              backgroundImage: 'radial-gradient(var(--glass-border) 1px, transparent 1px)',
-              backgroundSize: '20px 20px',
-              opacity: 0.8
-            }} />
-
-            {/* Custom SVG mapping */}
-            <svg width="100%" height="100%" viewBox="0 0 100 100" style={{ position: 'relative', zIndex: 5 }}>
-              {/* Path 1 */}
-              <motion.path 
-                d="M 15 80 Q 50 30 85 20" 
-                fill="none" 
-                stroke="var(--color-accent)" 
-                strokeWidth="1.5"
-                strokeDasharray="4,4"
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-              />
-
-              {/* Path 2 */}
-              <motion.path 
-                d="M 85 20 Q 75 75 40 85" 
-                fill="none" 
-                stroke="var(--color-purple)" 
-                strokeWidth="1"
-                strokeDasharray="3,3"
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
-              />
-
-              {/* Node A (Tashkent) */}
-              <g transform="translate(15,80)">
-                <circle r="4" fill="var(--color-accent)" />
-                <circle r="8" fill="none" stroke="var(--color-accent)" strokeWidth="0.75" opacity="0.6">
-                  <animate attributeName="r" values="4;12;4" dur="2.5s" repeatCount="indefinite" />
-                </circle>
-                <text y="-8" fontSize="4.5" fontWeight="bold" fill="var(--color-text-primary)" textAnchor="middle">Tashkent</text>
-              </g>
-
-              {/* Node B (Paris) */}
-              <g transform="translate(85,20)">
-                <circle r="4" fill="#10b981" />
-                <circle r="8" fill="none" stroke="#10b981" strokeWidth="0.75" opacity="0.6">
-                  <animate attributeName="r" values="4;12;4" dur="3s" repeatCount="indefinite" />
-                </circle>
-                <text y="-8" fontSize="4.5" fontWeight="bold" fill="var(--color-text-primary)" textAnchor="middle">Paris</text>
-              </g>
-
-              {/* Node C (Samarkand) */}
-              <g transform="translate(40,85)">
-                <circle r="3" fill="var(--color-purple)" />
-                <text y="8" fontSize="4.5" fontWeight="bold" fill="var(--color-text-muted)" textAnchor="middle">Samarkand</text>
-              </g>
-            </svg>
-          </div>
-        </div>
-      </motion.section>
-
-      {/* SECTION 7 — HOW IT WORKS */}
-      <motion.section 
-        {...sectionAnimation}
-        style={{ padding: '60px 24px', maxWidth: '1200px', margin: '0 auto' }}
-      >
-        <h2 className="section-title text-gradient">{t('howItWorks.title')}</h2>
-        <p className="section-subtitle">{t('howItWorks.subtitle')}</p>
-
-        {/* Steps Layout */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', 
-          alignItems: 'stretch', 
-          gap: '24px',
-          position: 'relative'
-        }} className="steps-container-landing">
-          {[
-            { id: '01', color: 'rgba(14, 165, 233, 0.1)', textCol: 'var(--color-accent)', titleKey: 'howItWorks.step1Title', descKey: 'howItWorks.step1Desc' },
-            { id: '02', color: 'rgba(99, 102, 241, 0.1)', textCol: 'var(--color-purple)', titleKey: 'howItWorks.step2Title', descKey: 'howItWorks.step2Desc' },
-            { id: '03', color: 'rgba(245, 158, 11, 0.1)', textCol: 'var(--color-accent-gold)', titleKey: 'howItWorks.step3Title', descKey: 'howItWorks.step3Desc' },
-            { id: '04', color: 'rgba(16, 185, 129, 0.1)', textCol: '#10b981', titleKey: 'howItWorks.step4Title', descKey: 'howItWorks.step4Desc' },
-            { id: '05', color: 'rgba(236, 72, 153, 0.1)', textCol: '#ec4899', titleKey: 'howItWorks.step5Title', descKey: 'howItWorks.step5Desc' },
-            { id: '06', color: 'rgba(139, 92, 246, 0.1)', textCol: '#8b5cf6', titleKey: 'howItWorks.step6Title', descKey: 'howItWorks.step6Desc' }
-          ].map((step, idx) => (
-            <div 
-              key={idx} 
-              className="glass-panel" 
-              style={{ 
-                padding: '32px 20px', 
-                textAlign: 'center', 
-                background: 'var(--color-bg-surface)', 
-                minHeight: '240px', 
-                display: 'flex', 
-                flexDirection: 'column', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                gap: '12px',
-                border: '1px solid var(--glass-border)'
-              }}
-            >
-              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: step.color, color: step.textCol, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.9rem' }}>
-                {step.id}
-              </div>
-              <h4 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--color-text-primary)', margin: 0 }}>
-                {t(step.titleKey)}
-              </h4>
-              <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', lineHeight: 1.5, margin: 0 }}>
-                {t(step.descKey)}
+            <div>
+              <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--color-text-primary)', margin: '0 0 8px 0', fontFamily: "var(--font-sans, 'Inter', sans-serif)" }}>
+                {t('howItWorks.step1Title')}
+              </h3>
+              <p style={{ fontSize: '0.92rem', color: 'var(--color-text-secondary)', lineHeight: 1.6, margin: 0 }}>
+                {t('howItWorks.step1Desc')}
               </p>
             </div>
-          ))}
+
+            {/* Real Product UI Mock */}
+            <div style={{
+              background: 'var(--color-bg)',
+              borderRadius: '16px',
+              border: '1px solid var(--glass-border)',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+              marginTop: 'auto'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--color-text-muted)', fontWeight: 700 }}>
+                <span>{t('howItWorks.step1PromptInput')}</span>
+                <span style={{ color: 'var(--accent, #2563EB)' }}>{t('howItWorks.step1VerifiedNlp')}</span>
+              </div>
+              <div style={{
+                background: 'var(--color-bg-surface)',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                color: 'var(--color-text-primary)',
+                border: '1px solid var(--border)'
+              }}>
+                {t('howItWorks.step1SamplePrompt')}
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.7rem', padding: '4px 8px', borderRadius: '6px', background: 'rgba(37, 99, 235, 0.1)', color: '#2563EB', fontWeight: 700 }}>{t('howItWorks.step1Tag1')}</span>
+                <span style={{ fontSize: '0.7rem', padding: '4px 8px', borderRadius: '6px', background: 'rgba(124, 58, 237, 0.1)', color: '#7C3AED', fontWeight: 700 }}>{t('howItWorks.step1Tag2')}</span>
+                <span style={{ fontSize: '0.7rem', padding: '4px 8px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.1)', color: '#10B981', fontWeight: 700 }}>{t('howItWorks.step1Tag3')}</span>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Step 2 */}
+          <motion.div
+            whileHover={{ y: -6 }}
+            style={{
+              background: 'var(--color-bg-surface)',
+              border: '1px solid var(--glass-border)',
+              borderRadius: '24px',
+              padding: '36px 28px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px',
+              boxShadow: 'var(--glass-shadow)',
+              position: 'relative',
+              overflow: 'hidden'
+            }}
+          >
+            <div style={{
+              width: '54px',
+              height: '54px',
+              borderRadius: '16px',
+              background: 'rgba(124, 58, 237, 0.12)',
+              color: '#7C3AED',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1.3rem',
+              fontWeight: 900,
+              fontFamily: "var(--font-sans, 'Inter', sans-serif)"
+            }}>
+              02
+            </div>
+
+            <div>
+              <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--color-text-primary)', margin: '0 0 8px 0', fontFamily: "var(--font-sans, 'Inter', sans-serif)" }}>
+                {t('howItWorks.step2Title')}
+              </h3>
+              <p style={{ fontSize: '0.92rem', color: 'var(--color-text-secondary)', lineHeight: 1.6, margin: 0 }}>
+                {t('howItWorks.step2Desc')}
+              </p>
+            </div>
+
+            {/* Real Product UI Mock */}
+            <div style={{
+              background: 'var(--color-bg)',
+              borderRadius: '16px',
+              border: '1px solid var(--glass-border)',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              marginTop: 'auto'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#7C3AED' }}>{t('howItWorks.step2Generating')}</span>
+                <span style={{ fontSize: '0.72rem', color: '#10B981', fontWeight: 700 }}>{t('howItWorks.step2Optimized')}</span>
+              </div>
+              <div style={{ padding: '8px 12px', background: 'var(--color-bg-surface)', borderRadius: '8px', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.1rem' }}>🏛️</span>
+                <div style={{ fontSize: '0.78rem', lineHeight: 1.2 }}>
+                  <strong style={{ color: 'var(--color-text-primary)', display: 'block' }}>{t('howItWorks.step2MockDay')}</strong>
+                  <span style={{ color: 'var(--color-text-muted)' }}>{t('howItWorks.step2MockDaySub')}</span>
+                </div>
+              </div>
+              <div style={{ padding: '8px 12px', background: 'var(--color-bg-surface)', borderRadius: '8px', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.1rem' }}>🏨</span>
+                <div style={{ fontSize: '0.78rem', lineHeight: 1.2 }}>
+                  <strong style={{ color: 'var(--color-text-primary)', display: 'block' }}>{t('howItWorks.step2MockHotel')}</strong>
+                  <span style={{ color: '#10B981' }}>{t('howItWorks.step2MockHotelSub')}</span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Step 3 */}
+          <motion.div
+            whileHover={{ y: -6 }}
+            style={{
+              background: 'var(--color-bg-surface)',
+              border: '1px solid var(--glass-border)',
+              borderRadius: '24px',
+              padding: '36px 28px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px',
+              boxShadow: 'var(--glass-shadow)',
+              position: 'relative',
+              overflow: 'hidden'
+            }}
+          >
+            <div style={{
+              width: '54px',
+              height: '54px',
+              borderRadius: '16px',
+              background: 'rgba(236, 72, 153, 0.12)',
+              color: '#EC4899',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1.3rem',
+              fontWeight: 900,
+              fontFamily: "var(--font-sans, 'Inter', sans-serif)"
+            }}>
+              03
+            </div>
+
+            <div>
+              <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--color-text-primary)', margin: '0 0 8px 0', fontFamily: "var(--font-sans, 'Inter', sans-serif)" }}>
+                {t('howItWorks.step3Title')}
+              </h3>
+              <p style={{ fontSize: '0.92rem', color: 'var(--color-text-secondary)', lineHeight: 1.6, margin: 0 }}>
+                {t('howItWorks.step3Desc')}
+              </p>
+            </div>
+
+            {/* Real Product UI Mock */}
+            <div style={{
+              background: 'var(--color-bg)',
+              borderRadius: '16px',
+              border: '1px solid var(--glass-border)',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+              marginTop: 'auto'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--color-text-muted)', fontWeight: 700 }}>
+                <span>{t('howItWorks.step3SyncShare')}</span>
+                <span style={{ color: '#EC4899' }}>{t('howItWorks.step3LiveOffline')}</span>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ flex: 1, padding: '10px', background: 'rgba(16, 185, 129, 0.08)', borderRadius: '10px', border: '1px solid rgba(16, 185, 129, 0.2)', textAlign: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#10B981', display: 'block' }}>{t('howItWorks.step3OfflineSynced')}</span>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>{t('howItWorks.step3AppleWallet')}</span>
+                </div>
+                <div style={{ flex: 1, padding: '10px', background: 'rgba(37, 99, 235, 0.08)', borderRadius: '10px', border: '1px solid rgba(37, 99, 235, 0.2)', textAlign: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--accent, #2563EB)', display: 'block' }}>{t('howItWorks.step3SharedTrip')}</span>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>{t('howItWorks.step3CoTravelers')}</span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
         </div>
-      </motion.section>
+      </section>
 
-      {/* SECTION 8 — WHY TRAVELUZ */}
-      <motion.section 
-        {...sectionAnimation}
-        style={{ padding: '60px 24px', maxWidth: '1200px', margin: '0 auto' }}
+      {/* ======================================================== */}
+      {/* SECTION 5 — DESTINATIONS SCROLL STORYTELLING */}
+      {/* ======================================================== */}
+      <DestinationStorytelling 
+        onSelectDestination={(id) => {
+          setSelectedCountryModal(id);
+        }}
+      />
+
+      {/* ======================================================== */}
+      {/* SECTION 5B — DESTINATION EXPLORER (Continents & 3D Tilt) */}
+      {/* ======================================================== */}
+      <DestinationExplorerSection 
+        onSelectCountry={(countryId) => {
+          setSelectedCountryModal(countryId);
+        }}
+        onPlanTrip={(countryId) => {
+          onStartPlanning(countryId, 'planner');
+        }}
+      />
+
+      {/* ======================================================== */}
+      {/* SECTION 6 — AI TRIP PLANNER (Interactive Generator) */}
+      {/* ======================================================== */}
+      <AiPlannerSection 
+        onBuildTrip={(planData) => {
+          localStorage.setItem('ai_preset_plan', JSON.stringify(planData));
+          onStartPlanning(planData.destination.toLowerCase(), 'planner');
+        }}
+      />
+
+      {/* ======================================================== */}
+      {/* SECTION 7 — WHY TRIPMIND */}
+      {/* ======================================================== */}
+      <section 
+        id="why-tripmind"
+        style={{
+          padding: '80px 24px',
+          maxWidth: '1240px',
+          margin: '0 auto',
+          position: 'relative'
+        }}
       >
-        <h2 className="section-title text-gradient">{t('why.title')}</h2>
-        <p className="section-subtitle">{t('why.subtitle')}</p>
+        <div style={{ textAlign: 'center', marginBottom: '56px' }}>
+          <span style={{
+            fontFamily: "var(--font-sans, 'Inter', sans-serif)",
+            color: '#2563EB',
+            fontWeight: 800,
+            textTransform: 'uppercase',
+            fontSize: '0.8rem',
+            letterSpacing: '2px',
+            display: 'inline-block',
+            marginBottom: '8px'
+          }}>
+            {t('why.badge')}
+          </span>
+          <h2 style={{
+            fontFamily: "var(--font-display, 'DM Serif Display', 'Playfair Display', Georgia, serif)",
+            fontSize: 'clamp(2.2rem, 4vw, 3.2rem)',
+            fontWeight: 700,
+            color: 'var(--color-text-primary)',
+            margin: '0 0 14px 0'
+          }}>
+            {t('why.title')}
+          </h2>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '1.1rem', maxWidth: '580px', margin: '0 auto' }}>
+            {t('why.subtitle')}
+          </p>
+        </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
+        {/* 6 Core Pillars Grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gap: '24px'
+        }}>
           {[
-            { title: t('why.card1Title'), desc: t('why.card1Desc'), icon: <Brain size={28} />, color: 'var(--color-purple)' },
-            { title: t('why.card2Title'), desc: t('why.card2Desc'), icon: <Compass size={28} />, color: 'var(--color-accent)' },
-            { title: t('why.card3Title'), desc: t('why.card3Desc'), icon: <Tag size={28} />, color: '#10b981' },
-            { title: t('why.card4Title'), desc: t('why.card4Desc'), icon: <Hotel size={28} />, color: '#f59e0b' },
-            { title: t('why.card5Title'), desc: t('why.card5Desc'), icon: <Globe size={28} />, color: '#06b6d4' },
-            { title: t('why.card6Title'), desc: t('why.card6Desc'), icon: <Lock size={28} />, color: '#ef4444' },
-            { title: t('why.card7Title'), desc: t('why.card7Desc'), icon: <Languages size={28} />, color: '#8b5cf6' },
-            { title: t('why.card8Title'), desc: t('why.card8Desc'), icon: <MessageSquare size={28} />, color: '#ec4899' }
-          ].map((feat, idx) => (
+            {
+              title: t('why.pillars.itineraries.title'),
+              desc: t('why.pillars.itineraries.desc'),
+              icon: <Brain size={26} />,
+              color: '#2563EB'
+            },
+            {
+              title: t('why.pillars.recommendations.title'),
+              desc: t('why.pillars.recommendations.desc'),
+              icon: <Sparkles size={26} />,
+              color: '#7C3AED'
+            },
+            {
+              title: t('why.pillars.destinationInfo.title'),
+              desc: t('why.pillars.destinationInfo.desc'),
+              icon: <Globe size={26} />,
+              color: '#10B981'
+            },
+            {
+              title: t('why.pillars.savedDestinations.title'),
+              desc: t('why.pillars.savedDestinations.desc'),
+              icon: <Tag size={26} />,
+              color: '#EC4899'
+            },
+            {
+              title: t('why.pillars.tripManagement.title'),
+              desc: t('why.pillars.tripManagement.desc'),
+              icon: <Compass size={26} />,
+              color: '#F59E0B'
+            },
+            {
+              title: t('why.pillars.smartSearch.title'),
+              desc: t('why.pillars.smartSearch.desc'),
+              icon: <Search size={26} />,
+              color: '#06B6D4'
+            }
+          ].map((pillar, idx) => (
             <motion.div
               key={idx}
-              whileHover={{ y: -8, boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}
-              className="glass-panel"
+              whileHover={{ y: -6, boxShadow: 'var(--glass-shadow)' }}
               style={{
-                padding: '32px 24px',
-                textAlign: 'left',
+                background: 'var(--color-bg-surface)',
+                border: '1px solid var(--glass-border)',
+                borderRadius: '24px',
+                padding: '32px 26px',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '16px',
-                background: 'var(--color-bg-surface)',
-                border: '1px solid var(--glass-border)'
+                boxShadow: '0 4px 20px rgba(0,0,0,0.04)',
+                textAlign: 'left'
               }}
             >
               <div style={{
-                color: feat.color,
-                background: 'rgba(255,255,255,0.05)',
-                padding: '12px',
+                width: '50px',
+                height: '50px',
                 borderRadius: '16px',
-                width: 'fit-content',
+                background: `${pillar.color}15`,
+                color: pillar.color,
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.1)'
+                justifyContent: 'center'
               }}>
-                {feat.icon}
+                {pillar.icon}
               </div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-primary)', margin: 0 }}>
-                {feat.title}
+
+              <h3 style={{
+                fontSize: '1.25rem',
+                fontWeight: 800,
+                color: 'var(--color-text-primary)',
+                margin: 0
+              }}>
+                {pillar.title}
               </h3>
-              <p style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', lineHeight: 1.6, margin: 0 }}>
-                {feat.desc}
+
+              <p style={{
+                fontSize: '0.9rem',
+                color: 'var(--color-text-secondary)',
+                lineHeight: 1.6,
+                margin: 0
+              }}>
+                {pillar.desc}
               </p>
             </motion.div>
           ))}
         </div>
-      </motion.section>
+      </section>
 
-      {/* SECTION 9 — USER STORIES */}
-      <motion.section 
-        {...sectionAnimation}
-        style={{ padding: '60px 24px', maxWidth: '1200px', margin: '0 auto' }}
+      {/* ======================================================== */}
+      {/* SECTION 8 — PRODUCT PREVIEW (Interactive UI Tabs) */}
+      {/* ======================================================== */}
+      <section 
+        id="product-preview"
+        style={{
+          padding: '80px 24px',
+          maxWidth: '1240px',
+          margin: '0 auto',
+          position: 'relative'
+        }}
       >
-        <h2 className="section-title text-gradient">{t('userStories.title')}</h2>
-        <p className="section-subtitle">{t('userStories.subtitle')}</p>
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+          <span style={{
+            fontFamily: "var(--font-sans, 'Inter', sans-serif)",
+            color: '#2563EB',
+            fontWeight: 800,
+            textTransform: 'uppercase',
+            fontSize: '0.8rem',
+            letterSpacing: '2px',
+            display: 'inline-block',
+            marginBottom: '8px'
+          }}>
+            {t('productPreview.badge')}
+          </span>
+          <h2 style={{
+            fontFamily: "var(--font-display, 'DM Serif Display', 'Playfair Display', Georgia, serif)",
+            fontSize: 'clamp(2.2rem, 4vw, 3.2rem)',
+            fontWeight: 700,
+            color: 'var(--color-text-primary)',
+            margin: '0 0 14px 0'
+          }}>
+            {t('productPreview.title')}
+          </h2>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '1.05rem', maxWidth: '560px', margin: '0 auto' }}>
+            {t('productPreview.subtitle')}
+          </p>
+        </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+        {/* Tab Selector */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          gap: '8px',
+          flexWrap: 'wrap',
+          marginBottom: '28px'
+        }}>
           {[
-            { title: t('userStories.card1Title'), desc: t('userStories.card1Desc'), icon: <Users size={28} />, color: 'var(--color-accent)' },
-            { title: t('userStories.card2Title'), desc: t('userStories.card2Desc'), icon: <Sparkles size={28} />, color: 'var(--color-purple)' },
-            { title: t('userStories.card3Title'), desc: t('userStories.card3Desc'), icon: <Compass size={28} />, color: '#10b981' }
-          ].map((story, idx) => (
-            <div 
-              key={idx} 
-              className="glass-panel" 
+            { id: 'explore', label: t('productPreview.tabs.explore') },
+            { id: 'my-trips', label: t('productPreview.tabs.myTrips') },
+            { id: 'planner', label: t('productPreview.tabs.planner') },
+            { id: 'country', label: t('productPreview.tabs.country') }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setPreviewTab(tab.id as any)}
               style={{
-                padding: '36px',
-                textAlign: 'left',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '20px',
+                padding: '12px 24px',
+                borderRadius: '12px',
+                background: previewTab === tab.id ? 'linear-gradient(135deg, #2563EB, #7C3AED)' : 'var(--color-bg-surface)',
+                color: previewTab === tab.id ? '#ffffff' : 'var(--color-text-secondary)',
+                border: previewTab === tab.id ? 'none' : '1px solid var(--glass-border)',
+                fontWeight: 800,
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                boxShadow: previewTab === tab.id ? '0 6px 18px rgba(37, 99, 235, 0.35)' : 'none'
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Realistic Interactive Mock Frame */}
+        <div style={{
+          background: 'var(--color-bg-surface)',
+          borderRadius: '28px',
+          border: '1px solid var(--glass-border)',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.12)',
+          overflow: 'hidden',
+          minHeight: '480px'
+        }}>
+          {/* Mock Browser Header */}
+          <div style={{
+            padding: '14px 20px',
+            background: 'var(--color-bg)',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#EF4444' }} />
+              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#F59E0B' }} />
+              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10B981' }} />
+            </div>
+            <div style={{
+              flex: 1,
+              maxWidth: '380px',
+              margin: '0 auto',
+              background: 'var(--color-bg-surface)',
+              borderRadius: '8px',
+              padding: '4px 12px',
+              fontSize: '0.74rem',
+              color: 'var(--color-text-muted)',
+              textAlign: 'center',
+              border: '1px solid var(--border)'
+            }}>
+              https://tripmind.app/{previewTab}
+            </div>
+          </div>
+
+          {/* Preview Tab Contents */}
+          <div style={{ padding: '32px' }}>
+            {previewTab === 'explore' && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px' }}>
+                <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h4 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--color-text-primary)' }}>{t('productPreview.exploreTitle')}</h4>
+                  <span style={{ fontSize: '0.8rem', color: '#2563EB', fontWeight: 700 }}>{t('productPreview.exploreSub')}</span>
+                </div>
+                {[
+                  { name: 'Tokyo, Japan', img: 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=400&q=80', status: t('productPreview.trendingHub') },
+                  { name: 'Paris, France', img: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=400&q=80', status: t('productPreview.topRated') },
+                  { name: 'Samarkand, Uzbekistan', img: 'https://images.unsplash.com/photo-1587974928442-77dc3e0dba72?auto=format&fit=crop&w=400&q=80', status: t('productPreview.culturalGem') }
+                ].map((item, idx) => (
+                  <div key={idx} style={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid var(--border)', background: 'var(--color-bg)' }}>
+                    <img src={item.img} alt={item.name} style={{ width: '100%', height: '140px', objectFit: 'cover' }} />
+                    <div style={{ padding: '14px' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#2563EB', fontWeight: 800 }}>{item.status}</span>
+                      <h5 style={{ margin: '2px 0 0 0', fontSize: '1rem', color: 'var(--color-text-primary)' }}>{item.name}</h5>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {previewTab === 'my-trips' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h4 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--color-text-primary)' }}>{t('productPreview.myTripsTitle')}</h4>
+                  <span style={{ fontSize: '0.8rem', color: '#10B981', fontWeight: 700 }}>{t('productPreview.confirmedVoyages')}</span>
+                </div>
+                <div style={{ padding: '20px', borderRadius: '16px', background: 'var(--color-bg)', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <img src="https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=120&q=80" alt="Italy" style={{ width: '60px', height: '60px', borderRadius: '12px', objectFit: 'cover' }} />
+                    <div>
+                      <strong style={{ fontSize: '1.1rem', color: 'var(--color-text-primary)', display: 'block' }}>{t('productPreview.amalfiTrip')}</strong>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>{t('productPreview.amalfiTripSub')}</span>
+                    </div>
+                  </div>
+                  <span style={{ padding: '6px 14px', borderRadius: '50px', background: 'rgba(16, 185, 129, 0.12)', color: '#10B981', fontSize: '0.8rem', fontWeight: 800 }}>{t('productPreview.vouchersReady')}</span>
+                </div>
+              </div>
+            )}
+
+            {previewTab === 'planner' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h4 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--color-text-primary)' }}>{t('productPreview.wizardTitle')}</h4>
+                  <span style={{ fontSize: '0.8rem', color: '#7C3AED', fontWeight: 700 }}>{t('productPreview.step2of3')}</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+                  <div style={{ padding: '16px', borderRadius: '12px', background: 'var(--color-bg)', border: '1px solid var(--border)' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 800 }}>{t('productPreview.datesLabel')}</span>
+                    <strong style={{ display: 'block', fontSize: '0.9rem', color: 'var(--color-text-primary)', marginTop: '4px' }}>{t('productPreview.datesValue')}</strong>
+                  </div>
+                  <div style={{ padding: '16px', borderRadius: '12px', background: 'var(--color-bg)', border: '1px solid var(--border)' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 800 }}>{t('planner.budget')}</span>
+                    <strong style={{ display: 'block', fontSize: '0.9rem', color: '#10B981', marginTop: '4px' }}>{t('productPreview.budgetMax')}</strong>
+                  </div>
+                  <div style={{ padding: '16px', borderRadius: '12px', background: 'var(--color-bg)', border: '1px solid var(--border)' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 800 }}>{t('planner.style')}</span>
+                    <strong style={{ display: 'block', fontSize: '0.9rem', color: '#2563EB', marginTop: '4px' }}>{t('productPreview.styleValue')}</strong>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {previewTab === 'country' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h4 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--color-text-primary)' }}>{t('productPreview.dossierTitle')}</h4>
+                  <span style={{ fontSize: '0.8rem', color: '#2563EB', fontWeight: 700 }}>{t('productPreview.visaFree90')}</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                  <div style={{ padding: '14px', borderRadius: '12px', background: 'var(--color-bg)', border: '1px solid var(--border)' }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>{t('productPreview.capital')}</span>
+                    <strong style={{ display: 'block', color: 'var(--color-text-primary)' }}>{t('productPreview.tashkent')}</strong>
+                  </div>
+                  <div style={{ padding: '14px', borderRadius: '12px', background: 'var(--color-bg)', border: '1px solid var(--border)' }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>{t('productPreview.currency')}</span>
+                    <strong style={{ display: 'block', color: 'var(--color-text-primary)' }}>UZS (Soʻm)</strong>
+                  </div>
+                  <div style={{ padding: '14px', borderRadius: '12px', background: 'var(--color-bg)', border: '1px solid var(--border)' }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>{t('productPreview.bestSeason')}</span>
+                    <strong style={{ display: 'block', color: 'var(--color-text-primary)' }}>{t('productPreview.springAutumn')}</strong>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* ======================================================== */}
+      {/* SECTION 9 — FAQ */}
+      {/* ======================================================== */}
+      <section 
+        id="faq"
+        style={{
+          padding: '80px 24px',
+          maxWidth: '900px',
+          margin: '0 auto',
+          position: 'relative'
+        }}
+      >
+        <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+          <span style={{
+            fontFamily: "var(--font-sans, 'Inter', sans-serif)",
+            color: '#2563EB',
+            fontWeight: 800,
+            textTransform: 'uppercase',
+            fontSize: '0.8rem',
+            letterSpacing: '2px',
+            display: 'inline-block',
+            marginBottom: '8px'
+          }}>
+            {t('faq.badge')}
+          </span>
+          <h2 style={{
+            fontFamily: "var(--font-display, 'DM Serif Display', 'Playfair Display', Georgia, serif)",
+            fontSize: 'clamp(2.2rem, 4vw, 3rem)',
+            fontWeight: 700,
+            color: 'var(--color-text-primary)',
+            margin: '0 0 12px 0'
+          }}>
+            {t('faq.title')}
+          </h2>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '1.05rem', margin: 0 }}>
+            {t('faq.subtitle')}
+          </p>
+        </div>
+
+        {/* Accordion List */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {faqItems.map((item, idx) => {
+            const isOpen = activeFaq === idx;
+            return (
+              <div
+                key={idx}
+                style={{
+                  background: 'var(--color-bg-surface)',
+                  borderRadius: '18px',
+                  border: isOpen ? '1px solid #2563EB' : '1px solid var(--glass-border)',
+                  overflow: 'hidden',
+                  transition: 'all 0.2s ease',
+                  boxShadow: isOpen ? '0 8px 25px rgba(37, 99, 235, 0.1)' : '0 2px 8px rgba(0,0,0,0.03)'
+                }}
+              >
+                <button
+                  onClick={() => setActiveFaq(isOpen ? null : idx)}
+                  style={{
+                    width: '100%',
+                    padding: '20px 24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    background: 'transparent',
+                    border: 'none',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    color: 'var(--color-text-primary)',
+                    fontSize: '1.05rem',
+                    fontWeight: 800,
+                    fontFamily: "'Outfit', sans-serif"
+                  }}
+                >
+                  <span>{item.q}</span>
+                  <ChevronDown
+                    size={18}
+                    style={{
+                      transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.25s ease',
+                      color: isOpen ? '#2563EB' : 'var(--color-text-muted)',
+                      flexShrink: 0,
+                      marginLeft: '12px'
+                    }}
+                  />
+                </button>
+
+                <AnimatePresence>
+                  {isOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.25 }}
+                    >
+                      <div style={{
+                        padding: '0 24px 22px 24px',
+                        fontSize: '0.95rem',
+                        color: 'var(--color-text-secondary)',
+                        lineHeight: 1.65,
+                        borderTop: '1px solid var(--border)',
+                        paddingTop: '16px'
+                      }}>
+                        {item.a}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* ======================================================== */}
+      {/* SECTION 10 — FINAL CTA */}
+      {/* ======================================================== */}
+      <section style={{ padding: '60px 24px 100px 24px' }}>
+        <motion.div
+          whileHover={{ scale: 1.01 }}
+          style={{
+            maxWidth: '1100px',
+            margin: '0 auto',
+            borderRadius: '36px',
+            position: 'relative',
+            overflow: 'hidden',
+            background: 'linear-gradient(135deg, #1E3A8A 0%, #3B82F6 40%, #7C3AED 75%, #EC4899 100%)',
+            boxShadow: '0 25px 60px rgba(37, 99, 235, 0.35)',
+            padding: '70px 32px',
+            textAlign: 'center',
+            color: '#ffffff'
+          }}
+        >
+          {/* Subtle Ambient Radial Overlay */}
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.5) 100%)',
+            pointerEvents: 'none'
+          }} />
+
+          <div style={{ position: 'relative', zIndex: 5, maxWidth: '680px', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+            <div style={{
+              width: '50px',
+              height: '50px',
+              borderRadius: '50%',
+              background: 'rgba(255, 255, 255, 0.2)',
+              backdropFilter: 'blur(10px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#ffffff'
+            }}>
+              <Compass size={28} />
+            </div>
+
+            <h2 style={{
+              fontFamily: "var(--font-display, 'DM Serif Display', 'Playfair Display', Georgia, serif)",
+              fontSize: 'clamp(2.4rem, 5vw, 3.8rem)',
+              fontWeight: 700,
+              lineHeight: 1.1,
+              margin: 0
+            }}>
+              {t('cta.title')}
+            </h2>
+
+            <p style={{
+              fontSize: 'clamp(1.1rem, 2.5vw, 1.4rem)',
+              fontWeight: 600,
+              color: 'rgba(255, 255, 255, 0.92)',
+              margin: 0
+            }}>
+              {t('cta.subtitle')}
+            </p>
+
+            <motion.button
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => handleAction('planner')}
+              style={{
+                marginTop: '12px',
+                padding: '16px 44px',
+                borderRadius: '16px',
+                background: '#ffffff',
+                color: '#1E3A8A',
+                border: 'none',
+                fontSize: '1.05rem',
+                fontWeight: 900,
+                cursor: 'pointer',
+                boxShadow: '0 10px 30px rgba(0, 0, 0, 0.25)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '10px',
+                fontFamily: "'Outfit', sans-serif"
+              }}
+            >
+              <span>{t('cta.primaryButton')}</span>
+              <ArrowRight size={18} />
+            </motion.button>
+          </div>
+        </motion.div>
+      </section>
+
+      {/* ======================================================== */}
+      {/* INTERACTIVE WALKTHROUGH DEMO MODAL */}
+      {/* ======================================================== */}
+      <AnimatePresence>
+        {showDemoModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.75)',
+              backdropFilter: 'blur(12px)',
+              zIndex: 2000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '20px'
+            }}
+            onClick={() => setShowDemoModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: 'var(--color-bg-surface, #ffffff)',
+                borderRadius: '28px',
+                border: '1px solid var(--border)',
+                width: '100%',
+                maxWidth: '680px',
+                padding: '36px 32px',
+                position: 'relative',
+                boxShadow: '0 25px 70px rgba(0,0,0,0.4)',
+                textAlign: 'left'
+              }}
+            >
+              <button
+                onClick={() => setShowDemoModal(false)}
+                style={{
+                  position: 'absolute',
+                  top: '20px',
+                  right: '20px',
+                  background: 'var(--color-bg)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '50%',
+                  width: '36px',
+                  height: '36px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: 'var(--color-text-primary)'
+                }}
+              >
+                <X size={18} />
+              </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#2563EB', fontWeight: 800, fontSize: '0.82rem', textTransform: 'uppercase', marginBottom: '8px' }}>
+                <Play size={16} /> {t('demoModal.badge')}
+              </div>
+
+              <h3 style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--color-text-primary)', margin: '0 0 16px 0', fontFamily: "'Outfit', sans-serif" }}>
+                {t('demoModal.title')}
+              </h3>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', margin: '24px 0' }}>
+                <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#2563EB', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem', flexShrink: 0 }}>1</div>
+                  <div>
+                    <strong style={{ color: 'var(--color-text-primary)', display: 'block', fontSize: '0.95rem' }}>{t('demoModal.step1Title')}</strong>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>{t('demoModal.step1Desc')}</p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#7C3AED', color: '#fff', display: 'flex', alignItems: 'center', fontWeight: 800, justifyContent: 'center', fontSize: '0.8rem', flexShrink: 0 }}>2</div>
+                  <div>
+                    <strong style={{ color: 'var(--color-text-primary)', display: 'block', fontSize: '0.95rem' }}>{t('demoModal.step2Title')}</strong>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>{t('demoModal.step2Desc')}</p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#EC4899', color: '#fff', display: 'flex', alignItems: 'center', fontWeight: 800, justifyContent: 'center', fontSize: '0.8rem', flexShrink: 0 }}>3</div>
+                  <div>
+                    <strong style={{ color: 'var(--color-text-primary)', display: 'block', fontSize: '0.95rem' }}>{t('demoModal.step3Title')}</strong>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>{t('demoModal.step3Desc')}</p>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowDemoModal(false);
+                  handleAction('planner');
+                }}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, #2563EB, #7C3AED)',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontSize: '0.95rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  fontFamily: "'Outfit', sans-serif"
+                }}
+              >
+                {t('demoModal.tryPlannerBtn')}
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ======================================================== */}
+      {/* INTERACTIVE COUNTRY DETAIL DOSSIER MODAL */}
+      {/* ======================================================== */}
+      <AnimatePresence>
+        {selectedCountryModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.78)',
+              backdropFilter: 'blur(16px)',
+              zIndex: 2100,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '24px 16px'
+            }}
+            onClick={() => setSelectedCountryModal(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.94, y: 24 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.94, y: 24 }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%',
+                maxWidth: '920px',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                borderRadius: '28px',
+                boxShadow: '0 30px 80px rgba(0,0,0,0.5)',
                 background: 'var(--color-bg-surface)',
                 border: '1px solid var(--glass-border)'
               }}
             >
-              <div style={{
-                color: story.color,
-                background: 'rgba(255,255,255,0.05)',
-                padding: '12px',
-                borderRadius: '16px',
-                width: 'fit-content',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.1)'
-              }}>
-                {story.icon}
-              </div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-primary)', margin: 0 }}>
-                {story.title}
-              </h3>
-              <p style={{ fontSize: '0.95rem', color: 'var(--color-text-secondary)', lineHeight: 1.6, margin: 0 }}>
-                {story.desc}
-              </p>
-            </div>
-          ))}
-        </div>
-      </motion.section>
-
-      {/* SECTION 10 — CTA BANNER */}
-      <motion.section 
-        {...sectionAnimation}
-        style={{ padding: '60px 24px' }}
-      >
-        <div style={{
-          position: 'relative',
-          overflow: 'hidden',
-          borderRadius: '32px',
-          maxWidth: '1200px',
-          margin: '0 auto',
-          boxShadow: 'var(--glass-shadow)',
-          border: '1px solid var(--glass-border)',
-          background: 'linear-gradient(-45deg, #1a73e8, #7c3aed, #ec4899, #10b981)',
-          backgroundSize: '400% 400%',
-          animation: 'gradientFlow 15s ease infinite',
-        }} className="cta-banner-wrapper">
-          <style dangerouslySetInnerHTML={{ __html: `
-            @keyframes gradientFlow {
-              0% { background-position: 0% 50%; }
-              50% { background-position: 100% 50%; }
-              100% { background-position: 0% 50%; }
-            }
-          `}} />
-
-          {/* Transparent Backdrop Layer */}
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'rgba(5, 8, 20, 0.75)',
-            backdropFilter: 'blur(4px)'
-          }} />
-
-          <div style={{
-            position: 'relative',
-            padding: '80px 40px',
-            textAlign: 'center',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '24px',
-            zIndex: 5
-          }}>
-            <Sparkles size={40} style={{ color: 'var(--color-accent)' }} />
-            <h2 style={{ fontSize: '2.5rem', fontWeight: 900, fontFamily: 'var(--font-heading)', color: '#ffffff', margin: 0 }}>
-              {t('cta.title')}
-            </h2>
-            <p style={{ color: '#d1d5db', fontSize: '1.15rem', maxWidth: '600px', margin: 0, lineHeight: 1.6 }}>
-              {t('cta.subtitle')}
-            </p>
-
-            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
-              <button 
-                onClick={() => handleAuthGate('planner')}
-                className="btn-premium"
-                style={{ padding: '16px 48px', border: 'none', background: '#ffffff', color: '#1f2937' }}
-              >
-                {t('cta.primaryButton')}
-              </button>
-              <button 
-                onClick={() => handleAuthGate('planner')}
-                className="btn-secondary"
-                style={{ padding: '16px 48px', color: '#ffffff', borderColor: 'rgba(255,255,255,0.2)', background: 'transparent' }}
-              >
-                {t('cta.secondaryButton')}
-              </button>
-            </div>
-          </div>
-        </div>
-      </motion.section>
-
-      {/* SECTION 11 — APP DOWNLOAD */}
-      <motion.section 
-        {...sectionAnimation}
-        style={{ padding: '60px 24px 100px 24px', maxWidth: '1200px', margin: '0 auto' }}
-      >
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-          gap: '40px',
-          alignItems: 'center',
-          textAlign: 'left'
-        }}>
-          {/* Mockup photo */}
-          <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
-            <div style={{
-              width: '280px',
-              height: '560px',
-              borderRadius: '40px',
-              border: '12px solid #1f2937',
-              overflow: 'hidden',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-              position: 'relative'
-            }}>
-              <img 
-                src="https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=600&h=1200&q=80"
-                alt="App Interface"
-                loading="lazy"
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              <CountryInfoPanel 
+                country={selectedCountryModal}
+                onClose={() => setSelectedCountryModal(null)}
+                onCreateTrip={(dest) => {
+                  const targetCountry = (dest as any)?.countryId || (dest as any)?.country || selectedCountryModal;
+                  setSelectedCountryModal(null);
+                  onStartPlanning(typeof targetCountry === 'string' ? targetCountry : 'france', 'planner');
+                }}
+                onExploreDestination={(dest) => {
+                  const targetCountry = (dest as any)?.countryId || (dest as any)?.country || selectedCountryModal;
+                  setSelectedCountryModal(null);
+                  onStartPlanning(typeof targetCountry === 'string' ? targetCountry : 'france', 'explore');
+                }}
               />
-              {/* Overlay elements */}
-              <div style={{ position: 'absolute', top: '24px', left: '16px', background: 'rgba(255,255,255,0.9)', padding: '6px 12px', borderRadius: '12px', fontSize: '0.65rem', fontWeight: 800, color: '#111827' }}>
-                📍 Maldives Golden Stay
-              </div>
-            </div>
-          </div>
-
-          {/* Details */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <h3 style={{ fontSize: '2.2rem', fontWeight: 900, fontFamily: 'var(--font-heading)', color: 'var(--color-text-primary)', margin: 0, lineHeight: 1.2 }}>
-              {t('appDownload.title')}
-            </h3>
-            <p style={{ color: 'var(--color-text-secondary)', fontSize: '1.1rem', lineHeight: 1.6, margin: 0 }}>
-              {t('appDownload.subtitle')}
-            </p>
-
-            <div style={{ display: 'flex', gap: '16px', marginTop: '10px' }}>
-              <button 
-                onClick={() => alert('App Store redirecting...')}
-                style={{
-                  padding: '12px 24px',
-                  borderRadius: '12px',
-                  background: '#000000',
-                  color: '#ffffff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  fontWeight: 700,
-                  fontSize: '0.85rem',
-                  border: '1px solid #1f2937'
-                }}
-              >
-                <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-.96.04-2.13.64-2.82 1.45-.6.69-1.12 1.83-.98 2.94.1.08.2.08.3.08.92-.08 1.91-.6 2.51-1.41"/></svg>
-                <span>App Store</span>
-              </button>
-
-              <button 
-                onClick={() => alert('Play Store redirecting...')}
-                style={{
-                  padding: '12px 24px',
-                  borderRadius: '12px',
-                  background: '#000000',
-                  color: '#ffffff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  fontWeight: 700,
-                  fontSize: '0.85rem',
-                  border: '1px solid #1f2937'
-                }}
-              >
-                <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M5.23 2.06c-.19.2-.3.5-.3.9v18.08c0 .4.11.7.3.9l.06.06L15.35 12l.06-.06L5.29 2 Z M18.42 8.94 l-3.01 3.06 3.01 3.06 3.55-2.02c1.01-.57 1.01-1.5 0-2.07l-3.55-2.03 Z M5.95 21.02L14.74 12.24 5.95 3.46Z"/></svg>
-                <span>Google Play</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </motion.section>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

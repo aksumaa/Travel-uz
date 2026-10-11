@@ -1,131 +1,120 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { translations } from '../locales/translations';
-import type { Language } from '../locales/translations';
+import type { Language, TranslationDictionary } from '../locales/translations';
 
 interface LanguageContextProps {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, string | number>) => string;
 }
 
 const LanguageContext = createContext<LanguageContextProps | undefined>(undefined);
 
-export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [language, setLanguageState] = useState<Language>('uz');
-  const hydrated = useRef(false);
+const STORAGE_KEY = 'tripmind-language';
+const LEGACY_STORAGE_KEY = 'traveluz-lang';
 
-  useEffect(() => {
-    if (!hydrated.current) {
-      hydrated.current = true;
-      const saved = localStorage.getItem('traveluz-lang');
-      let next: Language = 'uz';
-      if (saved === 'uz' || saved === 'ru' || saved === 'en') next = saved;
-      else if (saved === 'UZ') next = 'uz';
-      else if (saved === 'RU') next = 'ru';
-      else if (saved === 'EN') next = 'en';
-      else {
-        const systemLang = navigator.language.split('-')[0].toLowerCase();
-        if (systemLang === 'ru') next = 'ru';
-        else if (systemLang === 'en') next = 'en';
-      }
-      if (next !== language) {
-        setLanguageState(next);
-        return;
+const getInitialLanguage = (): Language => {
+  if (typeof window === 'undefined') return 'en';
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (saved) {
+      const normalized = saved.toLowerCase();
+      if (normalized === 'uz' || normalized === 'ru' || normalized === 'en') {
+        return normalized as Language;
       }
     }
-    localStorage.setItem('traveluz-lang', language);
+
+    // Detect browser language
+    const browserLang = (navigator.language || navigator.languages?.[0] || '').toLowerCase().split('-')[0];
+    if (browserLang === 'uz' || browserLang === 'ru' || browserLang === 'en') {
+      return browserLang as Language;
+    }
+  } catch (e) {
+    console.error('Error retrieving initial language:', e);
+  }
+  return 'en';
+};
+
+export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [language, setLanguageState] = useState<Language>(getInitialLanguage);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, language);
+      localStorage.setItem(LEGACY_STORAGE_KEY, language);
+      document.documentElement.lang = language;
+    } catch (e) {
+      console.error('Error saving language to localStorage:', e);
+    }
   }, [language]);
 
   const setLanguage = (lang: Language) => {
-    // Standardize to lowercase
     const normalized = lang.toLowerCase() as Language;
-    setLanguageState(normalized);
+    if (normalized === 'uz' || normalized === 'ru' || normalized === 'en') {
+      setLanguageState(normalized);
+      try {
+        localStorage.setItem(STORAGE_KEY, normalized);
+        localStorage.setItem(LEGACY_STORAGE_KEY, normalized);
+        document.documentElement.lang = normalized;
+      } catch (e) {
+        console.error('Error saving language:', e);
+      }
+    }
   };
 
-  // Helper function to resolve nested keys like "nav.explore"
-  const t = (key: string): string => {
-    // Fallback mapping for older keys to prevent page breakdown
+  const getNestedValue = (obj: any, path: string): any => {
+    if (!obj || typeof obj !== 'object') return undefined;
+    const parts = path.split('.');
+    let current = obj;
+    for (const part of parts) {
+      if (current && typeof current === 'object' && part in current) {
+        current = current[part];
+      } else {
+        return undefined;
+      }
+    }
+    return current;
+  };
+
+  const t = (key: string, params?: Record<string, string | number>): string => {
+    // Backward compatibility mapping for older legacy keys
     const legacyKeys: Record<string, string> = {
-      'navbar.destinations': 'nav.explore',
+      'navbar.destinations': 'nav.destinations',
       'navbar.planner': 'nav.planner',
       'navbar.about': 'nav.about',
+      'navbar.howItWorks': 'nav.howItWorks',
+      'navbar.faq': 'nav.faq',
       'navbar.signIn': 'nav.login',
-      'navbar.signOut': 'common.back',
+      'navbar.signOut': 'nav.signOut',
       'navbar.myTrips': 'nav.trips',
-      'navbar.dashboard': 'dashboard.explore',
+      'navbar.dashboard': 'nav.dashboard',
       'landing.heroTitle': 'hero.headline',
-      'landing.heroSubtitle': 'hero.subheadline',
-      'landing.heroCta': 'hero.startPlanning',
+      'landing.heroSubtitle': 'hero.subtitle',
+      'landing.heroCta': 'hero.startExploring',
       'landing.heroExplore': 'hero.exploreWorld',
       'landing.searchPlaceholder': 'hero.searchPlaceholder',
       'landing.destinationsTitle': 'destinations.title',
       'landing.plannerHeading': 'planner.title',
-      'dashboard.whereTo': 'planner.where',
-      'dashboard.travelers': 'planner.travelers',
-      'dashboard.budget': 'planner.budget',
-      'dashboard.budgetLow': 'planner.budget',
-      'dashboard.budgetMed': 'planner.budget',
-      'dashboard.budgetHigh': 'planner.budget',
-      'dashboard.style': 'planner.style',
-      'dashboard.styleActive': 'planner.style',
-      'dashboard.styleRelax': 'planner.style',
-      'dashboard.styleHistory': 'planner.style',
-      'dashboard.styleNature': 'planner.style',
-      'auth.signIn': 'nav.login',
-      'auth.signUp': 'nav.getStarted',
-      'auth.welcomeBack': 'auth.welcome',
-      'auth.joinUs': 'auth.subtitle',
-      'auth.successLogin': 'common.confirm',
-      'auth.successRegister': 'common.confirm',
-      'auth.errorFields': 'common.error',
-      'dashboard.sidebarHome': 'dashboard.explore',
-      'dashboard.sidebarPlanner': 'dashboard.planner',
-      'dashboard.sidebarMyTrips': 'dashboard.myTrips',
-      'dashboard.sidebarReadyTrips': 'dashboard.readyTrips',
-      'dashboard.sidebarFlights': 'dashboard.flights',
-      'dashboard.sidebarHotels': 'dashboard.hotels',
-      'dashboard.sidebarAttractions': 'dashboard.attractions',
-      'dashboard.sidebarSaved': 'dashboard.saved',
-      'dashboard.sidebarAssistant': 'dashboard.assistant',
-      'dashboard.sidebarProfile': 'dashboard.profile',
-      'dashboard.sidebarSettings': 'dashboard.settings',
     };
 
-    const resolvedKey = legacyKeys[key] || key;
-    const keys = resolvedKey.split('.');
-    
-    // Safety check on language
-    const normalizedLang = (language.toLowerCase() as Language);
-    let current: any = translations[normalizedLang] || translations['uz'];
+    const targetKey = legacyKeys[key] || key;
+    const currentDict = translations[language] || translations['en'];
+    const fallbackDict = translations['en'];
 
-    for (const k of keys) {
-      if (current && typeof current === 'object' && k in current) {
-        current = current[k];
-      } else {
-        // If not found using mapped legacy key, check if raw key exists in new translation object directly
-        if (resolvedKey !== key) {
-          const rawKeys = key.split('.');
-          let rawCurrent: any = translations[normalizedLang] || translations['uz'];
-          let foundRaw = true;
-          for (const rk of rawKeys) {
-            if (rawCurrent && typeof rawCurrent === 'object' && rk in rawCurrent) {
-              rawCurrent = rawCurrent[rk];
-            } else {
-              foundRaw = false;
-              break;
-            }
-          }
-          if (foundRaw && typeof rawCurrent === 'string') {
-            return rawCurrent;
-          }
-        }
-        console.warn(`Translation key not found: ${key} (resolved to: ${resolvedKey}) for language: ${language}`);
-        return key;
-      }
+    let result = getNestedValue(currentDict, targetKey);
+    if (result === undefined && currentDict !== fallbackDict) {
+      result = getNestedValue(fallbackDict, targetKey);
     }
 
-    if (typeof current === 'string') {
-      return current;
+    if (typeof result === 'string') {
+      if (params) {
+        let interpolated = result;
+        for (const [paramKey, paramVal] of Object.entries(params)) {
+          interpolated = interpolated.replace(new RegExp(`\\{${paramKey}\\}`, 'g'), String(paramVal));
+        }
+        return interpolated;
+      }
+      return result;
     }
 
     return key;
